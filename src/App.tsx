@@ -66,6 +66,8 @@ export default function App() {
             <BusinessPillars
               lang={lang}
               setActiveTab={setActiveTab}
+              onSelectServiceForEnquiry={handleSelectServiceForEnquiry}
+              onSelectCourseForAdmission={handleSelectCourseForAdmission}
             />
             <Announcements
               lang={lang}

@@ -9,11 +9,15 @@ import cscImg from '../assets/images/csc_digital_service_1793034988430.jpg';
 interface BusinessPillarsProps {
   lang: Language;
   setActiveTab: (tab: ActiveTab) => void;
+  onSelectServiceForEnquiry: (serviceName: string) => void;
+  onSelectCourseForAdmission: (courseName: string) => void;
 }
 
 export const BusinessPillars: React.FC<BusinessPillarsProps> = ({
   lang,
   setActiveTab,
+  onSelectServiceForEnquiry,
+  onSelectCourseForAdmission,
 }) => {
   const t = TRANSLATIONS[lang];
 
@@ -92,17 +96,20 @@ export const BusinessPillars: React.FC<BusinessPillarsProps> = ({
 
               <div className="pt-4 border-t border-slate-200/80 flex items-center justify-between">
                 <button
-                  onClick={() => setActiveTab('tax')}
+                  onClick={() => {
+                    setActiveTab('tax');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-800 hover:text-sky-950 transition-colors cursor-pointer"
                 >
                   <span>{t.learnMore}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => setActiveTab('enquire')}
-                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={() => onSelectServiceForEnquiry('GST / Income Tax Consultation')}
+                  className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
                 >
-                  {lang === 'as' ? 'পৰামৰ্শ লওক' : 'Consult Now'}
+                  {lang === 'as' ? 'অনুসন্ধান কৰক' : 'Enquire Now'}
                 </button>
               </div>
             </div>
@@ -164,17 +171,20 @@ export const BusinessPillars: React.FC<BusinessPillarsProps> = ({
 
               <div className="pt-4 border-t border-slate-200/80 flex items-center justify-between">
                 <button
-                  onClick={() => setActiveTab('courses')}
+                  onClick={() => {
+                    setActiveTab('courses');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-800 hover:text-blue-950 transition-colors cursor-pointer"
                 >
                   <span>{t.viewCourses}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => setActiveTab('enquire')}
-                  className="px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={() => onSelectCourseForAdmission('DCA (Diploma in Computer Applications)')}
+                  className="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
                 >
-                  {lang === 'as' ? 'নামভৰ্তি' : 'Apply'}
+                  {lang === 'as' ? 'নামভৰ্তিৰ আবেদন' : 'Apply for Admission'}
                 </button>
               </div>
             </div>
@@ -233,17 +243,20 @@ export const BusinessPillars: React.FC<BusinessPillarsProps> = ({
 
               <div className="pt-4 border-t border-slate-200/80 flex items-center justify-between">
                 <button
-                  onClick={() => setActiveTab('csc')}
+                  onClick={() => {
+                    setActiveTab('csc');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:text-emerald-950 transition-colors cursor-pointer"
                 >
                   <span>{t.viewCSC}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => setActiveTab('enquire')}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={() => onSelectServiceForEnquiry('CSC Citizen Service Assistance')}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
                 >
-                  {lang === 'as' ? 'সহায় বিচাৰক' : 'Assistance'}
+                  {lang === 'as' ? 'অনুসন্ধান কৰক' : 'Enquire Now'}
                 </button>
               </div>
             </div>
