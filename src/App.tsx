@@ -19,12 +19,98 @@ import { AcademicPortal } from './components/AcademicPortal';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModal } from './components/AuthModal';
 
+const VALID_TABS: ActiveTab[] = [
+  'home',
+  'tax',
+  'courses',
+  'csc',
+  'estimator',
+  'verify',
+  'academic',
+  'about',
+  'contact',
+  'enquire',
+];
+
+const getInitialTab = (): ActiveTab => {
+  if (typeof window !== 'undefined') {
+    // 1. Check URL hash (e.g. #verify, #estimator, #tax, etc.)
+    const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
+    if (hash && VALID_TABS.includes(hash as ActiveTab)) {
+      return hash as ActiveTab;
+    }
+    // 2. Check localStorage fallback
+    try {
+      const stored = localStorage.getItem('taxcent_active_tab') as ActiveTab;
+      if (stored && VALID_TABS.includes(stored)) {
+        return stored;
+      }
+    } catch {}
+  }
+  return 'home';
+};
+
+const getInitialLang = (): Language => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('taxcent_lang') as Language;
+      if (saved === 'en' || saved === 'as') return saved;
+    } catch {}
+  }
+  return 'en';
+};
+
 function MainApp() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('home');
-  const [lang, setLang] = useState<Language>('en');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
+  const [lang, setLang] = useState<Language>(getInitialLang);
   const [selectedService, setSelectedService] = useState<string>('');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [isDeploymentGuideOpen, setIsDeploymentGuideOpen] = useState<boolean>(false);
+
+  // Sync activeTab to URL hash and localStorage so refreshing reloads the exact same page
+  useEffect(() => {
+    try {
+      localStorage.setItem('taxcent_active_tab', activeTab);
+      const currentHash = window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
+      if (activeTab === 'home') {
+        if (currentHash && VALID_TABS.includes(currentHash as ActiveTab)) {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+      } else {
+        if (currentHash !== activeTab) {
+          window.history.replaceState(null, '', `#${activeTab}`);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not persist tab state:', err);
+    }
+  }, [activeTab]);
+
+  // Sync language selection to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('taxcent_lang', lang);
+    } catch {}
+  }, [lang]);
+
+  // Support browser Back and Forward buttons via hashchange
+  useEffect(() => {
+    const handleHashOrPop = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
+      if (hash && VALID_TABS.includes(hash as ActiveTab)) {
+        setActiveTab(hash as ActiveTab);
+      } else if (!hash) {
+        setActiveTab('home');
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashOrPop);
+    window.addEventListener('popstate', handleHashOrPop);
+    return () => {
+      window.removeEventListener('hashchange', handleHashOrPop);
+      window.removeEventListener('popstate', handleHashOrPop);
+    };
+  }, []);
 
   // Scroll to top on tab changes
   useEffect(() => {

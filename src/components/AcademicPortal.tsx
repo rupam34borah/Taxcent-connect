@@ -30,9 +30,29 @@ export const AcademicPortal: React.FC<AcademicPortalProps> = ({
   initialSubTab = 'verify',
 }) => {
   const { user, role, isAuthenticated, openAuthModal, logout } = useAuth();
-  const [currentSubTab, setCurrentSubTab] = useState<'verify' | 'student' | 'staff'>(
-    isAuthenticated ? initialSubTab : 'verify'
-  );
+  const [currentSubTab, setCurrentSubTab] = useState<'verify' | 'student' | 'staff'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('taxcent_academic_subtab') as 'verify' | 'student' | 'staff';
+        if (saved && ['verify', 'student', 'staff'].includes(saved)) {
+          return saved;
+        }
+      } catch {}
+    }
+    return isAuthenticated ? initialSubTab : 'verify';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('taxcent_academic_subtab', currentSubTab);
+    } catch {}
+  }, [currentSubTab]);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setCurrentSubTab(isAuthenticated ? initialSubTab : 'verify');
+    }
+  }, [initialSubTab, isAuthenticated]);
 
   // If user logs out while on student/staff tab, return to verify
   useEffect(() => {
