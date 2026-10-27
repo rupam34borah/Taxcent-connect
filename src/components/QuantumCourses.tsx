@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActiveTab, Language, CourseItem } from '../types';
 import { QUANTUM_COURSES, BUSINESS_CONTACTS } from '../data/content';
 import { Monitor, CheckCircle2, Clock, Award, BookOpen, MessageCircle, ArrowRight, Sparkles, Users, Calendar } from 'lucide-react';
+import labImg from '../assets/images/quantum_computer_lab_1793034987917.jpg';
 
 interface QuantumCoursesProps {
   lang: Language;
@@ -33,7 +34,7 @@ export const QuantumCourses: React.FC<QuantumCoursesProps> = ({
         <div className="relative rounded-3xl overflow-hidden bg-slate-900 text-white p-6 sm:p-10 mb-10 shadow-xl border border-sky-950">
           <div className="absolute inset-0">
             <img
-              src="/src/assets/images/quantum_computer_lab_1793034987917.jpg"
+              src={labImg}
               alt="Quantum Learning Institute Computer Training Lab"
               className="w-full h-full object-cover opacity-25"
               referrerPolicy="no-referrer"

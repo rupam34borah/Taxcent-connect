@@ -2,6 +2,9 @@ import React from 'react';
 import { ActiveTab, Language } from '../types';
 import { TRANSLATIONS, BUSINESS_CONTACTS } from '../data/content';
 import { ArrowRight, FileText, Monitor, Landmark, CheckCircle2, Phone, MessageSquare } from 'lucide-react';
+import heroImg from '../assets/images/hero_tax_consulting_1793034988759.jpg';
+import labImg from '../assets/images/quantum_computer_lab_1793034987917.jpg';
+import cscImg from '../assets/images/csc_digital_service_1793034988430.jpg';
 
 interface BusinessPillarsProps {
   lang: Language;
@@ -40,7 +43,7 @@ export const BusinessPillars: React.FC<BusinessPillarsProps> = ({
           <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex flex-col hover:border-sky-300 hover:shadow-lg transition-all">
             <div className="relative h-48 overflow-hidden bg-slate-900">
               <img
-                src="/src/assets/images/hero_tax_consulting_1793034988759.jpg"
+                src={heroImg}
                 alt="Taxcent Consulting Services Lakhimpur"
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
@@ -109,7 +112,7 @@ export const BusinessPillars: React.FC<BusinessPillarsProps> = ({
           <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex flex-col hover:border-blue-300 hover:shadow-lg transition-all">
             <div className="relative h-48 overflow-hidden bg-slate-900">
               <img
-                src="/src/assets/images/quantum_computer_lab_1793034987917.jpg"
+                src={labImg}
                 alt="Quantum Learning Institute Computer Training Lakhimpur"
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
@@ -181,7 +184,7 @@ export const BusinessPillars: React.FC<BusinessPillarsProps> = ({
           <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex flex-col hover:border-sky-300 hover:shadow-lg transition-all">
             <div className="relative h-48 overflow-hidden bg-slate-900">
               <img
-                src="/src/assets/images/csc_digital_service_1793034988430.jpg"
+                src={cscImg}
                 alt="CSC Ranabari Citizen Services Lakhimpur"
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActiveTab, Language, CSCServiceItem } from '../types';
 import { CSC_SERVICES, BUSINESS_CONTACTS } from '../data/content';
 import { Landmark, CheckCircle2, ShieldAlert, FileText, ExternalLink, MessageCircle, Phone, ArrowRight, Printer } from 'lucide-react';
+import cscImg from '../assets/images/csc_digital_service_1793034988430.jpg';
 
 interface CSCServicesProps {
   lang: Language;
@@ -33,7 +34,7 @@ export const CSCServices: React.FC<CSCServicesProps> = ({
         <div className="relative rounded-3xl overflow-hidden bg-slate-900 text-white p-6 sm:p-10 mb-8 shadow-xl border border-emerald-950">
           <div className="absolute inset-0">
             <img
-              src="/src/assets/images/csc_digital_service_1793034988430.jpg"
+              src={cscImg}
               alt="CSC Ranabari Common Service Centre Lakhimpur"
               className="w-full h-full object-cover opacity-20"
               referrerPolicy="no-referrer"

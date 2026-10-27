@@ -2,6 +2,7 @@ import React from 'react';
 import { ActiveTab, Language } from '../types';
 import { BUSINESS_CONTACTS, TRANSLATIONS } from '../data/content';
 import { Phone, MessageCircle, MapPin, ArrowRight, ShieldCheck, Award, Users, BookOpen } from 'lucide-react';
+import heroImg from '../assets/images/hero_tax_consulting_1793034988759.jpg';
 
 interface HeroProps {
   lang: Language;
@@ -119,7 +120,7 @@ export const Hero: React.FC<HeroProps> = ({
           <div className="lg:col-span-5 relative">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-sky-900/60 bg-slate-900 group">
               <img
-                src="/src/assets/images/hero_tax_consulting_1793034988759.jpg"
+                src={heroImg}
                 alt="Taxcent Consulting & Technology Centre in Lakhimpur, Assam"
                 className="w-full h-[320px] sm:h-[400px] object-cover group-hover:scale-102 transition-transform duration-500"
                 referrerPolicy="no-referrer"
