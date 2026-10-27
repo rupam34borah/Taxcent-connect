@@ -31,21 +31,21 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#0a2540] text-white border-b border-sky-950/60 shadow-md">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 md:gap-8">
+      <header className="sticky top-0 z-40 bg-[#0a2540] text-white border-b border-sky-950/60 shadow-md w-full overflow-hidden">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 h-16 flex items-center justify-between gap-1.5 sm:gap-4 md:gap-8">
           {/* Zone 1: Brand Wordmark */}
           <button
             onClick={() => handleNavClick('home')}
-            className="flex items-center gap-2 sm:gap-2.5 text-left focus:outline-hidden group cursor-pointer whitespace-nowrap shrink-0"
+            className="flex items-center gap-2 sm:gap-2.5 text-left focus:outline-hidden group cursor-pointer whitespace-nowrap shrink-0 min-w-0"
           >
-            <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center font-black text-white text-base sm:text-lg tracking-wider shadow-inner group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center font-black text-white text-base sm:text-lg tracking-wider shadow-inner group-hover:scale-105 transition-transform shrink-0">
               T
             </div>
-            <div>
-              <span className="text-base sm:text-lg font-bold tracking-tight text-white block leading-none">
+            <div className="min-w-0">
+              <span className="text-sm sm:text-lg font-bold tracking-tight text-white block leading-none truncate">
                 Taxcent Connect
               </span>
-              <span className="text-[10px] text-sky-200/80 font-medium tracking-wide block mt-0.5 sm:mt-1">
+              <span className="text-[9px] sm:text-[10px] text-sky-200/80 font-medium tracking-wide block mt-0.5 sm:mt-1 truncate max-w-[125px] sm:max-w-none">
                 {lang === 'as' ? 'ৰণবাৰী বজাৰ · লখিমপুৰ' : 'Ranabari Market · Lakhimpur'}
               </span>
             </div>
@@ -106,24 +106,24 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Zone 3: Primary Action Zone */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Always Visible Download App Button on Top */}
             <PWAInstallButton lang={lang} />
 
             {/* Language Switcher (EN | অসমীয়া) */}
             <button
               onClick={() => setLang(lang === 'en' ? 'as' : 'en')}
-              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-sky-950/80 border border-sky-800/60 text-xs font-semibold text-sky-200 hover:bg-sky-900 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-sky-950/80 border border-sky-800/60 text-xs font-semibold text-sky-200 hover:bg-sky-900 transition-colors cursor-pointer shrink-0"
               title="Toggle English / Assamese"
             >
-              <Globe className="w-3.5 h-3.5 text-sky-400" />
-              <span className="font-bold">{lang === 'en' ? 'অসমীয়া' : 'EN'}</span>
+              <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <span className="font-bold text-[11px] sm:text-xs">{lang === 'en' ? 'অসমীয়া' : 'EN'}</span>
             </button>
 
-            {/* Primary Enquire CTA */}
+            {/* Primary Enquire CTA (Desktop / Tablet only; mobile has hero + bottom bar + drawer) */}
             <button
               onClick={() => handleNavClick('enquire')}
-              className="px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+              className="hidden sm:inline-flex items-center px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
             >
               {lang === 'as' ? 'অনুসন্ধান' : 'Enquire'}
             </button>
@@ -131,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Mobile / Tablet Menu Button (☰ Hamburger) */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1.5 sm:p-2 rounded-xl bg-white/10 hover:bg-white/15 text-white transition-colors cursor-pointer flex items-center justify-center shrink-0 lg:hidden"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white transition-colors cursor-pointer flex items-center justify-center shrink-0 lg:hidden active:scale-95"
               aria-label="Toggle Menu"
               aria-expanded={mobileMenuOpen}
             >

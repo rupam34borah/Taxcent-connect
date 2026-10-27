@@ -30,18 +30,21 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ lang }) => {
       {/* Prominent Always-Visible Download App Button on Top */}
       <button
         onClick={handleInstallClick}
-        className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold shadow-md hover:shadow-emerald-600/20 transition-all cursor-pointer shrink-0 active:scale-95"
+        className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-bold shadow-xs hover:shadow-emerald-600/20 transition-all cursor-pointer shrink-0 active:scale-95"
         title={lang === 'as' ? 'মোবাইলত এপ ডাউনল’ড বা ইনষ্টল কৰক' : 'Download or Install App on Phone'}
       >
         {installSuccess ? (
           <>
-            <Check className="w-3.5 h-3.5 text-emerald-100" />
-            <span className="hidden xs:inline">{lang === 'as' ? 'ইনষ্টল হৈছে!' : 'Installed!'}</span>
+            <Check className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
+            <span className="text-[11px] sm:text-xs">{lang === 'as' ? 'ইনষ্টল হ’ল' : 'Installed'}</span>
           </>
         ) : (
           <>
-            <Download className="w-3.5 h-3.5 animate-pulse" />
-            <span>{lang === 'as' ? 'এপ ডাউনল’ড' : 'Download App'}</span>
+            <Download className="w-3.5 h-3.5 animate-pulse shrink-0" />
+            <span className="text-[11px] sm:text-xs font-semibold">
+              <span className="hidden sm:inline">{lang === 'as' ? 'এপ ডাউনল’ড' : 'Download App'}</span>
+              <span className="inline sm:hidden">{lang === 'as' ? 'এপ' : 'App'}</span>
+            </span>
           </>
         )}
       </button>
