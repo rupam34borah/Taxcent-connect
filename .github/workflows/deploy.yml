@@ -33,7 +33,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-  run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: Build Production Website
         run: npm run build
