@@ -47,9 +47,20 @@ export const Hero: React.FC<HeroProps> = ({
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-900/70 border border-amber-600/50 rounded-full px-3.5 py-1.5 cursor-pointer transition-colors shadow-xs"
               >
                 <Calculator className="w-3.5 h-3.5 text-amber-400" />
-                <span>{lang === 'as' ? 'দ্ৰুত কৰ কেলকুলেটৰ (AY 2025-26)' : 'Quick Tax Estimator (AY 2025-26)'}</span>
+                <span>{lang === 'as' ? 'দ্ৰুত কৰ কেলকুলেটৰ (AY 2027-28)' : 'Quick Tax Estimator (AY 2027-28)'}</span>
                 <span className="text-[10px] bg-amber-400/25 text-amber-200 px-1.5 py-0.5 rounded font-mono font-bold">
-                  NEW
+                  FY 26-27
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('verify')}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-200 bg-sky-950/80 hover:bg-sky-900 border border-sky-600/60 rounded-full px-3.5 py-1.5 cursor-pointer transition-colors shadow-xs"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+                <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষণ' : 'Verify Certificate'}</span>
+                <span className="text-[10px] bg-sky-500/30 text-sky-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                  QLI Registry
                 </span>
               </button>
             </div>
@@ -100,6 +111,15 @@ export const Hero: React.FC<HeroProps> = ({
               >
                 <MapPin className="w-4 h-4 text-sky-400" />
                 <span>{t.getDirections}</span>
+              </button>
+
+              {/* Verify Certificate Primary CTA */}
+              <button
+                onClick={() => setActiveTab('verify')}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-md transition-all min-h-[48px] cursor-pointer active:scale-95"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষণ' : 'Verify Certificate'}</span>
               </button>
             </div>
 

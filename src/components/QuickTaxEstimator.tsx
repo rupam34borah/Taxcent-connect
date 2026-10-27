@@ -35,8 +35,8 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
   setActiveTab,
   onSelectServiceForEnquiry,
 }) => {
-  // Assessment Year state
-  const [assessmentYear, setAssessmentYear] = useState<AssessmentYear>('2025-26');
+  // Assessment Year state (Default Base Year is AY 2027-28 / FY 2026-27)
+  const [assessmentYear, setAssessmentYear] = useState<AssessmentYear>('2027-28');
   const [ageGroup, setAgeGroup] = useState<TaxpayerAgeGroup>('under_60');
   const [isSalaried, setIsSalaried] = useState<boolean>(true);
   const [annualIncome, setAnnualIncome] = useState<number>(850000);
@@ -186,19 +186,19 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
               <Info className="w-4 h-4 text-sky-600" />
             </div>
 
-            <div className="grid grid-cols-3 gap-2.5 pt-1">
-              {/* AY 2025-26 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+              {/* AY 2027-28 (Current FY 2026-27 Base Year) */}
               <button
                 type="button"
-                onClick={() => setAssessmentYear('2025-26')}
+                onClick={() => setAssessmentYear('2027-28')}
                 className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
-                  assessmentYear === '2025-26'
+                  assessmentYear === '2027-28'
                     ? 'bg-sky-50 border-sky-600 ring-2 ring-sky-500/30 text-sky-950 font-bold shadow-xs'
                     : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-medium'
                 }`}
               >
-                <div className="text-xs sm:text-sm font-black">AY 2025-26</div>
-                <div className="text-[10px] text-sky-700 font-semibold mt-0.5">FY 2024-25</div>
+                <div className="text-xs sm:text-sm font-black">AY 2027-28</div>
+                <div className="text-[10px] text-sky-700 font-semibold mt-0.5">FY 2026-27</div>
                 <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold bg-sky-200/80 text-sky-900">
                   Current Year
                 </span>
@@ -217,7 +217,24 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
                 <div className="text-xs sm:text-sm font-black">AY 2026-27</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">FY 2025-26</div>
                 <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700">
-                  Upcoming
+                  Previous
+                </span>
+              </button>
+
+              {/* AY 2025-26 */}
+              <button
+                type="button"
+                onClick={() => setAssessmentYear('2025-26')}
+                className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
+                  assessmentYear === '2025-26'
+                    ? 'bg-sky-50 border-sky-600 ring-2 ring-sky-500/30 text-sky-950 font-bold shadow-xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-medium'
+                }`}
+              >
+                <div className="text-xs sm:text-sm font-black">AY 2025-26</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">FY 2024-25</div>
+                <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700">
+                  Prior Year
                 </span>
               </button>
 
@@ -234,17 +251,17 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
                 <div className="text-xs sm:text-sm font-black">AY 2024-25</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">FY 2023-24</div>
                 <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700">
-                  Previous
+                  Belated / Rev
                 </span>
               </button>
             </div>
 
-            {assessmentYear === '2025-26' && (
+            {assessmentYear !== '2024-25' && (
               <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-bold">Budget 2024 Slabs Active:</span> Standard deduction for salaried is{' '}
-                  <strong className="underline">₹75,000</strong>. Income up to <strong className="underline">₹7.75 Lakhs</strong> is tax-free for salaried under New Regime!
+                  <span className="font-bold">Budget 2024 Revised Slabs Active:</span> Standard deduction for salaried is{' '}
+                  <strong className="underline">₹75,000</strong>. Income up to <strong className="underline">₹7.75 Lakhs</strong> is 100% tax-free for salaried taxpayers under the New Tax Regime!
                 </div>
               </div>
             )}
@@ -486,7 +503,7 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
                     <td className="py-2.5 px-3 text-slate-600">
                       <div>Section 87A Tax Rebate</div>
                       <div className="text-[11px] text-slate-400">
-                        {assessmentYear === '2025-26' ? 'Up to ₹25,000 (New) / ₹12,500 (Old)' : 'Tax rebate'}
+                        {assessmentYear !== '2024-25' ? 'Up to ₹25,000 (New) / ₹12,500 (Old)' : 'Up to ₹25,000 (New) / ₹12,500 (Old)'}
                       </div>
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono font-semibold text-emerald-700 bg-sky-50/30">

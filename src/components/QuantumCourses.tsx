@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ActiveTab, Language, CourseItem } from '../types';
 import { QUANTUM_COURSES, BUSINESS_CONTACTS } from '../data/content';
-import { Monitor, CheckCircle2, Clock, Award, BookOpen, MessageCircle, ArrowRight, Sparkles, Users, Calendar } from 'lucide-react';
+import { Monitor, CheckCircle2, Clock, Award, BookOpen, MessageCircle, ArrowRight, Sparkles, Users, Calendar, ShieldCheck, GraduationCap } from 'lucide-react';
 import labImg from '../assets/images/quantum_computer_lab_1793034987917.jpg';
 
 interface QuantumCoursesProps {
@@ -94,6 +94,52 @@ export const QuantumCourses: React.FC<QuantumCoursesProps> = ({
                 <span>{lang === 'as' ? 'অসমীয়া DTP টাইপিং' : 'Assamese DTP Typing'}</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Quantum Credential Verification & Academic Portal Banner */}
+        <div className="bg-gradient-to-r from-slate-900 to-[#0a2540] border border-sky-800/60 rounded-3xl p-5 sm:p-6 mb-8 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-400 shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                  Authoritative Registry
+                </span>
+                <span className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full font-mono">
+                  Online Verification
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-white">
+                {lang === 'as' ? 'কোৱাণ্টাম প্ৰমাণপত্ৰ পৰীক্ষণ আৰু ছাত্ৰ পৰ্টেল' : 'Quantum Certificate Verification & Student Portal'}
+              </h3>
+              <p className="text-xs text-slate-300 max-w-xl">
+                {lang === 'as'
+                  ? 'নিযুক্তিদাতা আৰু ছাত্ৰসকলে প্ৰমাণপত্ৰ নম্বৰৰ দ্বাৰা তথ্য পৰীক্ষা কৰিব পাৰিব আৰু ছাত্ৰসকলে নিজৰ মাৰ্কশ্বীট ডাউনলোড কৰিব পাৰিব।'
+                  : 'Instantly authenticate course completion certificates or log in as a student to securely download official marksheets and credentials.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full md:w-auto justify-end shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('verify')}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষা কৰক' : 'Verify Certificate'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('academic')}
+              className="px-4 py-2.5 rounded-xl bg-sky-950/80 hover:bg-sky-900 border border-sky-700/60 text-sky-200 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <GraduationCap className="w-4 h-4 text-sky-400" />
+              <span>{lang === 'as' ? 'ছাত্ৰ পৰ্টেল' : 'Student Portal'}</span>
+            </button>
           </div>
         </div>
 

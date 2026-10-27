@@ -73,7 +73,7 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={() => setActiveTab('estimator')}
                   className="hover:text-white transition-colors cursor-pointer text-left text-sky-300 font-semibold flex items-center gap-1.5"
                 >
-                  <span>Quick Tax Estimator (AY 2025-26)</span>
+                  <span>Quick Tax Estimator (AY 2027-28 / FY 2026-27)</span>
                 </button>
               </li>
               <li>

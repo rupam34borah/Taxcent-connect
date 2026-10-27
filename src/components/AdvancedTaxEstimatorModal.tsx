@@ -40,7 +40,7 @@ export const AdvancedTaxEstimatorModal: React.FC<AdvancedTaxEstimatorModalProps>
   isOpen,
   onClose,
   lang,
-  initialAY = '2025-26',
+  initialAY = '2027-28',
   initialIncome = 750000,
   initialIsSalaried = true,
 }) => {
@@ -265,7 +265,7 @@ export const AdvancedTaxEstimatorModal: React.FC<AdvancedTaxEstimatorModalProps>
               {lang === 'as' ? 'কৰ নিৰ্ধাৰণ বৰ্ষ (AY):' : 'Assessment Year:'}
             </span>
             <div className="inline-flex rounded-xl p-0.5 bg-white border border-slate-300 shadow-xs">
-              {(['2025-26', '2026-27', '2024-25'] as AssessmentYear[]).map((ay) => (
+              {(['2027-28', '2026-27', '2025-26', '2024-25'] as AssessmentYear[]).map((ay) => (
                 <button
                   key={ay}
                   onClick={() => setAssessmentYear(ay)}
@@ -275,7 +275,7 @@ export const AdvancedTaxEstimatorModal: React.FC<AdvancedTaxEstimatorModalProps>
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  AY {ay} {ay === '2025-26' && <span className="ml-1 text-[10px] opacity-90">(Current)</span>}
+                  AY {ay} {ay === '2027-28' && <span className="ml-1 text-[10px] opacity-90">(Current FY 2026-27)</span>}
                 </button>
               ))}
             </div>

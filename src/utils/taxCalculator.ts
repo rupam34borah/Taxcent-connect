@@ -1,4 +1,4 @@
-export type AssessmentYear = '2025-26' | '2026-27' | '2024-25';
+export type AssessmentYear = '2027-28' | '2026-27' | '2025-26' | '2024-25';
 export type TaxpayerAgeGroup = 'under_60' | 'senior' | 'super_senior';
 
 export interface QuickTaxInputs {
@@ -321,9 +321,10 @@ export function calculateQuickTax(inputs: QuickTaxInputs): TaxCalculationResult 
   }
 
   const fyMap: Record<AssessmentYear, string> = {
-    '2025-26': 'FY 2024-25 (Current)',
-    '2026-27': 'FY 2025-26 (Upcoming)',
-    '2024-25': 'FY 2023-24 (Previous)',
+    '2027-28': 'FY 2026-27 (Current Year)',
+    '2026-27': 'FY 2025-26 (Previous Year)',
+    '2025-26': 'FY 2024-25 (Prior Year)',
+    '2024-25': 'FY 2023-24 (Belated/Revised)',
   };
 
   return {
@@ -531,9 +532,10 @@ export function calculateAdvancedTax(inputs: AdvancedTaxInputs): TaxCalculationR
   }
 
   const fyMap: Record<AssessmentYear, string> = {
-    '2025-26': 'FY 2024-25 (Current)',
-    '2026-27': 'FY 2025-26 (Upcoming)',
-    '2024-25': 'FY 2023-24 (Previous)',
+    '2027-28': 'FY 2026-27 (Current Year)',
+    '2026-27': 'FY 2025-26 (Previous Year)',
+    '2025-26': 'FY 2024-25 (Prior Year)',
+    '2024-25': 'FY 2023-24 (Belated/Revised)',
   };
 
   return {

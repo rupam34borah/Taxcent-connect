@@ -1,8 +1,28 @@
 import React, { useState } from 'react';
 import { ActiveTab, Language } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Phone, Globe, HelpCircle, Menu, X, ArrowRight, FileText, Monitor, Landmark, MessageSquare, MapPin, Calculator } from 'lucide-react';
+import { 
+  Phone, 
+  Globe, 
+  HelpCircle, 
+  Menu, 
+  X, 
+  ArrowRight, 
+  FileText, 
+  Monitor, 
+  Landmark, 
+  MessageSquare, 
+  MapPin, 
+  Calculator, 
+  ShieldCheck, 
+  GraduationCap,
+  LogIn,
+  LogOut,
+  User,
+  Lock
+} from 'lucide-react';
 import { BUSINESS_CONTACTS } from '../data/content';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -22,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenQuickCallback,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isAuthenticated, logout, openAuthModal } = useAuth();
 
   const handleNavClick = (tab: ActiveTab) => {
     setActiveTab(tab);
@@ -105,6 +126,17 @@ export const Header: React.FC<HeaderProps> = ({
               {lang === 'as' ? 'চিএছচি সেৱা' : 'CSC Citizen Services'}
             </button>
             <button
+              onClick={() => handleNavClick('verify')}
+              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'verify' || activeTab === 'academic'
+                  ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
+                  : 'hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+              <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষণ' : 'Verify Certificate'}</span>
+            </button>
+            <button
               onClick={() => handleNavClick('contact')}
               className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
                 activeTab === 'contact'
@@ -117,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Zone 3: Primary Action Zone */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Always Visible Download App Button on Top */}
             <PWAInstallButton lang={lang} />
 
@@ -131,7 +163,53 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-bold text-[11px] sm:text-xs">{lang === 'en' ? 'অসমীয়া' : 'EN'}</span>
             </button>
 
-            {/* Primary Enquire CTA (Desktop / Tablet only; mobile has hero + bottom bar + drawer) */}
+            {/* Verify Certificate CTA */}
+            <button
+              onClick={() => handleNavClick('verify')}
+              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeTab === 'verify'
+                  ? 'bg-amber-400 text-slate-950 font-extrabold ring-2 ring-amber-300'
+                  : 'bg-sky-950/90 hover:bg-sky-900 border border-sky-600/60 text-sky-200'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+              <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষণ' : 'Verify Certificate'}</span>
+            </button>
+
+            {/* Desktop Only Login / Authenticated User Pill (Header only for desktop version) */}
+            {!isAuthenticated ? (
+              <button
+                onClick={() => openAuthModal('student')}
+                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-200 border border-sky-600/60 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+                title="Login as Student, Staff, or Admin"
+              >
+                <LogIn className="w-3.5 h-3.5 text-sky-400" />
+                <span>{lang === 'as' ? 'লগইন' : 'Login'}</span>
+              </button>
+            ) : (
+              <div className="hidden lg:flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => handleNavClick('academic')}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-sky-950/90 border border-sky-600 text-xs font-bold text-white hover:bg-sky-900 transition-colors cursor-pointer"
+                  title={`${user?.name} (${user?.role}) - Open Portal`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${user?.role === 'admin' ? 'bg-amber-400' : user?.role === 'staff' ? 'bg-sky-400' : 'bg-emerald-400'}`} />
+                  <span className="max-w-[110px] truncate">{user?.name.split(' ')[0]}</span>
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-sky-900 text-sky-300 border border-sky-700">
+                    {user?.role}
+                  </span>
+                </button>
+                <button
+                  onClick={logout}
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/80 hover:text-rose-300 hover:border-rose-700/60 border border-slate-700 text-slate-300 transition-all cursor-pointer"
+                  title="Log Out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Primary Enquire CTA (Desktop / Tablet only) */}
             <button
               onClick={() => handleNavClick('enquire')}
               className="hidden sm:inline-flex items-center px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
@@ -156,10 +234,67 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* Slide-Down Mobile Navigation Menu */}
+      {/* Slide-Down Mobile Navigation Menu (Login button is in the menu for mobile) */}
       {mobileMenuOpen && (
         <div className="fixed inset-x-0 top-16 bottom-0 z-30 bg-slate-950/70 backdrop-blur-md lg:hidden animate-fade-in flex flex-col justify-between">
           <div className="bg-[#0a2540] border-b border-sky-900 p-5 shadow-2xl space-y-4 max-h-[80vh] overflow-y-auto">
+            {/* Mobile Menu Top: Login Button / Authenticated Session Card */}
+            {!isAuthenticated ? (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-sky-950 via-slate-900 to-[#0a2540] border border-sky-800/80 flex items-center justify-between gap-3 shadow-md">
+                <div>
+                  <div className="flex items-center gap-1.5 text-sky-300 text-xs font-bold">
+                    <Lock className="w-3.5 h-3.5 text-sky-400" />
+                    <span>{lang === 'as' ? 'ছাত্ৰ আৰু কৰ্মচাৰী লগইন' : 'Academic Portal Login'}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {lang === 'as' ? 'মাৰ্কশ্বীট চাবলৈ বা তথ্য নথিভুক্ত কৰিবলৈ' : 'Student marksheets & staff data input'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuthModal('student');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-extrabold transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>{lang === 'as' ? 'লগইন' : 'Login'}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-sky-950/90 border border-sky-700/80 flex items-center justify-between gap-3 shadow-md">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white truncate block">{user?.name}</span>
+                    <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40">
+                      {user?.role}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block truncate font-mono mt-0.5">
+                    {user?.studentIdCode || user?.email}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleNavClick('academic')}
+                    className="px-2.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Portal
+                  </button>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="p-1.5 rounded-xl bg-slate-800 text-rose-300 hover:bg-rose-950 border border-rose-800/80 text-xs font-bold transition-all cursor-pointer"
+                    title="Logout"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2">
               {lang === 'as' ? 'নেভিগেচন মেনু' : 'Navigation Menu'}
             </div>
@@ -196,11 +331,11 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <div className="flex items-center gap-2.5">
                   <Calculator className="w-4 h-4 text-emerald-400" />
-                  <span>{lang === 'as' ? 'দ্ৰুত আয়কৰ কেলকুলেটৰ (Quick Tax Estimator)' : 'Quick Tax Estimator (AY 2025-26)'}</span>
+                  <span>{lang === 'as' ? 'দ্ৰুত আয়কৰ কেলকুলেটৰ (Quick Tax Estimator)' : 'Quick Tax Estimator (AY 2027-28)'}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    AY 25-26
+                    AY 27-28
                   </span>
                   <ArrowRight className="w-4 h-4 opacity-70" />
                 </div>
@@ -217,6 +352,52 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>{lang === 'as' ? '২. কোৱাণ্টাম ইনষ্টিটিউট (কম্পিউটাৰ পাঠ্যক্ৰম)' : '2. Quantum Learning (Courses)'}</span>
                 </div>
                 <ArrowRight className="w-4 h-4 opacity-70" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('verify')}
+                className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm font-semibold transition-colors ${
+                  activeTab === 'verify' ? 'bg-sky-500 text-slate-950 font-bold' : 'text-slate-200 hover:bg-white/10'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষা (Verify Certificate)' : 'Verify Certificate (Authoritative Registry)'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Live
+                  </span>
+                  <ArrowRight className="w-4 h-4 opacity-70" />
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    setMobileMenuOpen(false);
+                    openAuthModal('student');
+                  } else {
+                    handleNavClick('academic');
+                  }
+                }}
+                className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm font-semibold transition-colors ${
+                  activeTab === 'academic' ? 'bg-sky-500 text-slate-950 font-bold' : 'text-slate-200 hover:bg-white/10'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <GraduationCap className="w-4 h-4 text-sky-400" />
+                  <span>{lang === 'as' ? 'শৈক্ষিক পৰ্টেল (ছাত্ৰ আৰু কৰ্মচাৰী)' : 'Student & Staff Academic Portal'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {!isAuthenticated && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      Login
+                    </span>
+                  )}
+                  <ArrowRight className="w-4 h-4 opacity-70" />
+                </div>
               </button>
 
               <button

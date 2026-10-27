@@ -15,8 +15,11 @@ import { Footer } from './components/Footer';
 import { MobileNav } from './components/MobileNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { FreeDeploymentModal } from './components/FreeDeploymentModal';
+import { AcademicPortal } from './components/AcademicPortal';
+import { AuthProvider } from './context/AuthContext';
+import { AuthModal } from './components/AuthModal';
 
-export default function App() {
+function MainApp() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [lang, setLang] = useState<Language>('en');
   const [selectedService, setSelectedService] = useState<string>('');
@@ -116,6 +119,20 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'verify' && (
+          <AcademicPortal
+            lang={lang}
+            initialSubTab="verify"
+          />
+        )}
+
+        {activeTab === 'academic' && (
+          <AcademicPortal
+            lang={lang}
+            initialSubTab="student"
+          />
+        )}
+
         {activeTab === 'enquire' && (
           <EnquirySection
             lang={lang}
@@ -157,6 +174,17 @@ export default function App() {
         onClose={() => setIsDeploymentGuideOpen(false)}
         lang={lang}
       />
+
+      {/* Authentication Modal for Student, Staff and Admin */}
+      <AuthModal lang={lang} />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }
