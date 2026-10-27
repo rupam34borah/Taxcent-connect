@@ -1,0 +1,6 @@
+{
+  "name": "Taxcent Connect",
+  "description": "Unified digital portal for Taxcent Consulting Services, Quantum Learning Institute, and CSC Ranabari at Ranabari Market, NH-15, Lakhimpur, Assam.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
