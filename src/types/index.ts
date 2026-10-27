@@ -1,6 +1,6 @@
 export type Language = 'en' | 'as';
 
-export type ActiveTab = 'home' | 'tax' | 'courses' | 'csc' | 'about' | 'contact' | 'enquire';
+export type ActiveTab = 'home' | 'tax' | 'courses' | 'csc' | 'estimator' | 'about' | 'contact' | 'enquire';
 
 export interface ServiceItem {
   id: string;

@@ -10,6 +10,7 @@ import { Announcements } from './components/Announcements';
 import { EnquirySection } from './components/EnquirySection';
 import { ContactLocation } from './components/ContactLocation';
 import { AboutSection } from './components/AboutSection';
+import { QuickTaxEstimator } from './components/QuickTaxEstimator';
 import { Footer } from './components/Footer';
 import { MobileNav } from './components/MobileNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -85,6 +86,14 @@ export default function App() {
 
         {activeTab === 'tax' && (
           <TaxServices
+            lang={lang}
+            setActiveTab={setActiveTab}
+            onSelectServiceForEnquiry={handleSelectServiceForEnquiry}
+          />
+        )}
+
+        {activeTab === 'estimator' && (
+          <QuickTaxEstimator
             lang={lang}
             setActiveTab={setActiveTab}
             onSelectServiceForEnquiry={handleSelectServiceForEnquiry}

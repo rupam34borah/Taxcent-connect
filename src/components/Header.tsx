@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ActiveTab, Language } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Phone, Globe, HelpCircle, Menu, X, ArrowRight, FileText, Monitor, Landmark, MessageSquare, MapPin } from 'lucide-react';
+import { Phone, Globe, HelpCircle, Menu, X, ArrowRight, FileText, Monitor, Landmark, MessageSquare, MapPin, Calculator } from 'lucide-react';
 import { BUSINESS_CONTACTS } from '../data/content';
 
 interface HeaderProps {
@@ -72,6 +72,17 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               {lang === 'as' ? 'কৰ আৰু একাউণ্ট' : 'Tax & Accounting'}
+            </button>
+            <button
+              onClick={() => handleNavClick('estimator')}
+              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'estimator'
+                  ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
+                  : 'hover:text-white'
+              }`}
+            >
+              <Calculator className="w-3.5 h-3.5 text-sky-400" />
+              <span>{lang === 'as' ? 'কৰ কেলকুলেটৰ' : 'Quick Tax Estimator'}</span>
             </button>
             <button
               onClick={() => handleNavClick('courses')}
@@ -175,6 +186,24 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>{lang === 'as' ? '১. টেক্সচেণ্ট কনচাল্টিং (কৰ আৰু জিএছটি)' : '1. Taxcent Consulting (Tax & GST)'}</span>
                 </div>
                 <ArrowRight className="w-4 h-4 opacity-70" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('estimator')}
+                className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm font-semibold transition-colors ${
+                  activeTab === 'estimator' ? 'bg-sky-500 text-slate-950 font-bold' : 'text-slate-200 hover:bg-white/10'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Calculator className="w-4 h-4 text-emerald-400" />
+                  <span>{lang === 'as' ? 'দ্ৰুত আয়কৰ কেলকুলেটৰ (Quick Tax Estimator)' : 'Quick Tax Estimator (AY 2025-26)'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    AY 25-26
+                  </span>
+                  <ArrowRight className="w-4 h-4 opacity-70" />
+                </div>
               </button>
 
               <button

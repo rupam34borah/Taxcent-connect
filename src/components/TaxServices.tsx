@@ -146,11 +146,12 @@ export const TaxServices: React.FC<TaxServicesProps> = ({
             ))}
 
             <button
-              onClick={() => setShowTaxTool(!showTaxTool)}
-              className="ml-auto flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+              onClick={() => setActiveTab('estimator')}
+              className="ml-auto flex items-center gap-1.5 text-xs font-bold text-sky-900 hover:text-white bg-sky-100 hover:bg-sky-700 border border-sky-300 px-3.5 py-1.5 rounded-xl cursor-pointer transition-all shadow-xs"
             >
-              <Calculator className="w-3.5 h-3.5 text-sky-600" />
-              <span>{lang === 'as' ? 'ইনকাম টেক্স কেলকুলেটৰ' : 'Quick Tax Estimator'}</span>
+              <Calculator className="w-3.5 h-3.5 text-sky-600 group-hover:text-white" />
+              <span>{lang === 'as' ? 'দ্ৰুত কৰ কেলকুলেটৰ' : 'Quick Tax Estimator'}</span>
+              <ArrowRight className="w-3 h-3 ml-0.5" />
             </button>
           </div>
         </div>

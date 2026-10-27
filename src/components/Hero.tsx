@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActiveTab, Language } from '../types';
 import { BUSINESS_CONTACTS, TRANSLATIONS } from '../data/content';
-import { Phone, MessageCircle, MapPin, ArrowRight, ShieldCheck, Award, Users, BookOpen } from 'lucide-react';
+import { Phone, MessageCircle, MapPin, ArrowRight, ShieldCheck, Award, Users, BookOpen, Calculator } from 'lucide-react';
 import heroImg from '../assets/images/hero_tax_consulting_1793034988759.jpg';
 
 interface HeroProps {
@@ -35,10 +35,23 @@ export const Hero: React.FC<HeroProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           {/* Left Column: Core Value Proposition & CTAs */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Location & Trust Tag */}
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-sky-300 bg-sky-950/70 border border-sky-800/60 rounded-full px-3.5 py-1.5">
-              <MapPin className="w-3.5 h-3.5 text-sky-400" />
-              <span>{t.heroTag}</span>
+            {/* Location & Trust Tag + Quick Tax Estimator Link */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 text-xs font-semibold text-sky-300 bg-sky-950/70 border border-sky-800/60 rounded-full px-3.5 py-1.5">
+                <MapPin className="w-3.5 h-3.5 text-sky-400" />
+                <span>{t.heroTag}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('estimator')}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-900/70 border border-amber-600/50 rounded-full px-3.5 py-1.5 cursor-pointer transition-colors shadow-xs"
+              >
+                <Calculator className="w-3.5 h-3.5 text-amber-400" />
+                <span>{lang === 'as' ? 'দ্ৰুত কৰ কেলকুলেটৰ (AY 2025-26)' : 'Quick Tax Estimator (AY 2025-26)'}</span>
+                <span className="text-[10px] bg-amber-400/25 text-amber-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                  NEW
+                </span>
+              </button>
             </div>
 
             {/* Main Headline */}
