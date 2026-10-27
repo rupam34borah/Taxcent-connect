@@ -119,7 +119,18 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
     };
 
     saveRecordLocally(record);
+    // Directly dispatch to WhatsApp 8876824424 upon submission
+    dispatchToWhatsApp(record, BUSINESS_CONTACTS.phone1);
+    // Immediately display preview of ticket
     setSubmittedTicket(record);
+
+    // Scroll smoothly to ticket preview
+    setTimeout(() => {
+      const el = document.getElementById('enquiry-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const handleCourseSubmit = (e: React.FormEvent) => {
@@ -153,7 +164,18 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
     };
 
     saveRecordLocally(record);
+    // Directly dispatch to WhatsApp 8876824424 upon submission
+    dispatchToWhatsApp(record, BUSINESS_CONTACTS.phone1);
+    // Immediately display preview of ticket
     setSubmittedTicket(record);
+
+    // Scroll smoothly to ticket preview
+    setTimeout(() => {
+      const el = document.getElementById('enquiry-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const saveRecordLocally = (record: EnquiryRecord) => {
@@ -166,20 +188,59 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
     }
   };
 
-  // Generate WhatsApp Direct link
-  const openWhatsAppSubmission = (record: EnquiryRecord, targetPhone: string) => {
-    let msg = '';
+  // Structured WhatsApp Message Formatting
+  const formatWhatsAppMessage = (record: EnquiryRecord): string => {
     if (record.type === 'course_admission') {
-      msg = `*New Admission Enquiry [Quantum Learning Institute]*\nTicket: ${record.id}\nStudent: ${record.clientName}\nMobile: ${record.phone}\nCourse: ${record.serviceOrCourse}\nDetails: ${record.location}\nNotes: ${record.notes || 'None'}\nSent from Taxcent Connect web app`;
-    } else {
-      msg = `*New Service Enquiry [${record.businessName}]*\nTicket: ${record.id}\nClient: ${record.clientName}\nMobile: ${record.phone}\nService: ${record.serviceOrCourse}\nLocality: ${record.location}\nNotes: ${record.notes || 'None'}\nSent from Taxcent Connect web app`;
+      return `*Taxcent Connect - Admission Ticket*\n` +
+        `------------------------------------\n` +
+        `🎫 *Ticket ID:* ${record.id}\n` +
+        `📅 *Date:* ${record.submittedAt}\n` +
+        `👤 *Student Name:* ${record.clientName}\n` +
+        `📱 *Mobile No:* +91 ${record.phone}\n` +
+        `🎓 *Course:* ${record.serviceOrCourse}\n` +
+        `📍 *Details:* ${record.location}\n` +
+        (record.notes ? `💬 *Query:* ${record.notes}\n` : '') +
+        `------------------------------------\n` +
+        `_Sent directly from Taxcent Connect web app_`;
     }
+    return `*Taxcent Connect - Service Ticket*\n` +
+      `------------------------------------\n` +
+      `🎫 *Ticket ID:* ${record.id}\n` +
+      `📅 *Date:* ${record.submittedAt}\n` +
+      `🏢 *Business:* ${record.businessName}\n` +
+      `👤 *Client Name:* ${record.clientName}\n` +
+      `📱 *Mobile No:* +91 ${record.phone}\n` +
+      `💼 *Service:* ${record.serviceOrCourse}\n` +
+      `📍 *Location:* ${record.location}\n` +
+      (record.notes ? `💬 *Notes:* ${record.notes}\n` : '') +
+      `------------------------------------\n` +
+      `_Sent directly from Taxcent Connect web app_`;
+  };
 
-    window.open(`https://wa.me/91${targetPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+  // Dispatch directly to WhatsApp 8876824424
+  const dispatchToWhatsApp = (record: EnquiryRecord, targetPhone: string = BUSINESS_CONTACTS.phone1) => {
+    const msg = formatWhatsAppMessage(record);
+    const cleanPhone = targetPhone.replace(/\D/g, '');
+    const waUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(msg)}`;
+
+    try {
+      const opened = window.open(waUrl, '_blank', 'noopener,noreferrer');
+      if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+        const link = document.createElement('a');
+        link.href = waUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch {
+      window.location.href = waUrl;
+    }
   };
 
   const copyTicketDetails = (record: EnquiryRecord) => {
-    const text = `Enquiry ID: ${record.id}\nBusiness: ${record.businessName}\nItem: ${record.serviceOrCourse}\nName: ${record.clientName}\nPhone: ${record.phone}\nDate: ${record.submittedAt}`;
+    const text = `Enquiry Ticket ID: ${record.id}\nBusiness: ${record.businessName}\nService/Course: ${record.serviceOrCourse}\nName: ${record.clientName}\nPhone: +91 ${record.phone}\nDetails: ${record.location}\nDate: ${record.submittedAt}`;
     navigator.clipboard.writeText(text);
     setCopiedText(true);
     setTimeout(() => setCopiedText(false), 3000);
@@ -237,95 +298,157 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
 
         {/* Confirmation Screen / WhatsApp Action Card if submitted */}
         {submittedTicket ? (
-          <div className="rounded-3xl bg-white p-6 sm:p-8 border border-sky-300 shadow-xl space-y-6 animate-fade-in">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-7 h-7" />
+          <div className="rounded-3xl bg-white p-6 sm:p-8 border-2 border-emerald-400 shadow-xl space-y-6 animate-fade-in">
+            {/* Automatic WhatsApp Sent Announcement Banner */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full text-white">
+                      Direct WhatsApp Sent
+                    </span>
+                    <span className="text-xs font-mono font-bold text-emerald-100">
+                      #{submittedTicket.id}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white mt-0.5">
+                    {lang === 'as'
+                      ? 'টিকট হোৱাটছএপলৈ (8876824424) প্ৰেৰণ কৰা হ’ল!'
+                      : 'Ticket Generated & Sent Directly to WhatsApp (+91 88768 24424)!'}
+                  </h3>
+                </div>
               </div>
-              <div>
-                <span className="text-[11px] font-mono font-bold text-sky-700 uppercase">
-                  Ticket Generated #{submittedTicket.id}
-                </span>
-                <h3 className="text-xl font-bold text-slate-900">
-                  {lang === 'as' ? 'অনুসন্ধান প্ৰস্তুত কৰা হৈছে!' : 'Enquiry Ticket Prepared Successfully!'}
-                </h3>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/80 text-[11px] font-mono text-emerald-100 border border-emerald-400/30">
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-300" />
+                <span>+91 88768 24424</span>
               </div>
             </div>
 
-            {/* Honest Transparency Notice */}
-            <div className="p-4 rounded-xl bg-sky-50 border border-sky-100 text-xs text-sky-900 space-y-1">
-              <strong className="block font-semibold">
-                {lang === 'as' ? 'গুৰুত্বপূৰ্ণ সতৰ্কতা (Client-Side Verification):' : 'Transparent Processing Notice:'}
-              </strong>
-              <p>
+            {/* Direct Confirmation Notice */}
+            <div className="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-950 space-y-1.5">
+              <p className="font-semibold flex items-center gap-1.5">
+                <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {lang === 'as'
+                    ? 'আপোনাৰ টিকট স্বয়ংক্ৰিয়ভাৱে হোৱাটছএপত (৮৮৭৬৮২৪৪২৪) প্ৰেৰণ কৰা হৈছে। তলত আপোনাৰ টিকটৰ প্ৰিভিউ দিয়া হ’ল:'
+                    : 'Your ticket details were automatically launched to WhatsApp number 8876824424. Below is your official ticket preview and booking reference:'}
+                </span>
+              </p>
+              <p className="text-[11px] text-emerald-800">
                 {lang === 'as'
-                  ? 'এই ফৰ্মৰ তথ্যসমূহ ব্ৰাউজাৰত সাজু হৈছে। আমাৰ কাৰ্যালয়ত তৎক্ষণাৎ পোনপটীয়াকৈ জমা দিবলৈ তলৰ "Send via WhatsApp" বুটামত ক্লিক কৰক।'
-                  : 'Your request details have been processed and validated in your browser. To ensure instantaneous response without delay, tap below to dispatch directly to our WhatsApp numbers, or our office will review during business hours.'}
+                  ? 'যদি আপোনাৰ ব্ৰাউজাৰ বা ম’বাইলত হোৱাটছএপ স্বয়ংক্ৰিয়ভাৱে নোলালে, তলৰ সেউজীয়া বুটামত ক্লিক কৰি পুনৰ হোৱাটছএপ মুকলি কৰিব পাৰিব।'
+                  : 'If WhatsApp did not launch automatically due to browser popup restrictions, please tap the green "Open WhatsApp (8876824424)" button below.'}
               </p>
             </div>
 
-            {/* Generated Ticket Summary */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
-              <div className="grid grid-cols-2 gap-2 pb-2 border-b border-slate-200">
+            {/* Generated Ticket Official Preview Card */}
+            <div className="rounded-2xl border-2 border-slate-200 bg-slate-50/70 p-5 sm:p-6 text-xs space-y-4 shadow-inner">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
                 <div>
-                  <span className="text-slate-500 block text-[11px]">Business:</span>
-                  <span className="font-bold text-slate-900">{submittedTicket.businessName}</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Official Ticket Preview
+                  </span>
+                  <span className="text-xl font-extrabold font-mono text-sky-800">
+                    #{submittedTicket.id}
+                  </span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-[11px]">Item:</span>
-                  <span className="font-bold text-slate-900">{submittedTicket.serviceOrCourse}</span>
+                <div className="text-right">
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full inline-flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Sent to WhatsApp 8876824424
+                  </span>
+                  <span className="block text-[10px] text-slate-500 mt-1 font-mono">
+                    {submittedTicket.submittedAt}
+                  </span>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-slate-500 block text-[11px]">Client Name:</span>
-                  <span className="font-medium text-slate-800">{submittedTicket.clientName}</span>
+
+              {/* Ticket Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-medium">Business / Service Unit:</span>
+                  <span className="font-bold text-slate-900 text-sm block mt-0.5">{submittedTicket.businessName}</span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-[11px]">Mobile Number:</span>
-                  <span className="font-mono font-medium text-slate-800">{submittedTicket.phone}</span>
+
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-medium">Requested Service / Course:</span>
+                  <span className="font-bold text-sky-700 text-sm block mt-0.5">{submittedTicket.serviceOrCourse}</span>
+                </div>
+
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-medium">Client / Student Name:</span>
+                  <span className="font-bold text-slate-900 text-sm block mt-0.5">{submittedTicket.clientName}</span>
+                </div>
+
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-medium">Contact Phone:</span>
+                  <span className="font-bold font-mono text-slate-900 text-sm block mt-0.5">+91 {submittedTicket.phone}</span>
                 </div>
               </div>
+
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-medium">Locality / Timing / Batch Details:</span>
+                <span className="text-slate-800 font-medium block mt-0.5">{submittedTicket.location}</span>
+              </div>
+
+              {submittedTicket.notes && (
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-medium">Additional Notes / Query:</span>
+                  <span className="text-slate-700 italic block mt-0.5">"{submittedTicket.notes}"</span>
+                </div>
+              )}
             </div>
 
-            {/* Dispatch Action Buttons (WhatsApp & Call) */}
+            {/* Action Buttons: WhatsApp Re-open, Alternate Phone, Copy, New Enquiry */}
             <div className="space-y-3 pt-2">
-              <span className="block text-xs font-bold text-slate-700 text-center">
-                {lang === 'as' ? 'তৎক্ষণাৎ হোৱাটছএপত প্ৰেৰণ কৰক:' : 'Send Ticket Directly to Our Phone via WhatsApp:'}
-              </span>
-              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
-                  onClick={() => openWhatsAppSubmission(submittedTicket, BUSINESS_CONTACTS.phone1)}
-                  className="py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-colors"
+                  type="button"
+                  onClick={() => dispatchToWhatsApp(submittedTicket, BUSINESS_CONTACTS.phone1)}
+                  className="py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-transform active:scale-98"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Send to {BUSINESS_CONTACTS.phone1}</span>
+                  <MessageCircle className="w-5 h-5" />
+                  <span>Open WhatsApp (8876824424)</span>
                 </button>
 
                 <button
-                  onClick={() => openWhatsAppSubmission(submittedTicket, BUSINESS_CONTACTS.phone2)}
-                  className="py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-colors"
+                  type="button"
+                  onClick={() => dispatchToWhatsApp(submittedTicket, BUSINESS_CONTACTS.phone2)}
+                  className="py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-colors"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Send to {BUSINESS_CONTACTS.phone2}</span>
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Send to Backup ({BUSINESS_CONTACTS.phone2})</span>
                 </button>
               </div>
 
-              <div className="flex items-center justify-between pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
                 <button
+                  type="button"
                   onClick={() => copyTicketDetails(submittedTicket)}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5"
+                  className="text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-slate-300 hover:bg-slate-100 cursor-pointer"
                 >
                   <Copy className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{copiedText ? 'Copied to Clipboard!' : 'Copy Ticket Text'}</span>
+                  <span>{copiedText ? 'Copied Ticket to Clipboard!' : 'Copy Ticket Text'}</span>
                 </button>
 
                 <button
-                  onClick={() => setSubmittedTicket(null)}
-                  className="text-xs font-bold text-sky-700 hover:text-sky-900"
+                  type="button"
+                  onClick={() => {
+                    setSubmittedTicket(null);
+                    setClientName('');
+                    setClientPhone('');
+                    setClientLocality('');
+                    setServiceNotes('');
+                    setStudentName('');
+                    setStudentPhone('');
+                    setCourseNotes('');
+                  }}
+                  className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer py-1.5 px-3"
                 >
-                  {lang === 'as' ? 'অন্য এটা অনুসন্ধান কৰক' : 'Submit Another Enquiry'}
+                  {lang === 'as' ? '← অন্য এটা অনুসন্ধান কৰক' : '← Submit Another Enquiry'}
                 </button>
               </div>
             </div>
@@ -508,13 +631,22 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full py-3.5 px-6 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-sky-600 via-sky-700 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-extrabold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-98"
                   >
-                    <Send className="w-4 h-4" />
-                    <span>{lang === 'as' ? 'অনুসন্ধান দাখিল কৰক (Submit Enquiry)' : 'Submit Enquiry & Prepare Ticket'}</span>
+                    <MessageCircle className="w-5 h-5 text-emerald-300" />
+                    <span>
+                      {lang === 'as'
+                        ? 'টিকট বনাওক আৰু হোৱাটছএপত প্ৰেৰণ কৰক (8876824424)'
+                        : 'Generate Ticket & Send to WhatsApp (8876824424)'}
+                    </span>
                   </button>
-                  <p className="text-[11px] text-slate-500 text-center mt-2">
-                    🔒 Zero spam guarantee. We do not ask for bank passwords, PAN OTPs, or sensitive private documents online.
+                  <p className="text-[11px] text-slate-500 text-center mt-2 flex items-center justify-center gap-1">
+                    <span>⚡</span>
+                    <span>
+                      {lang === 'as'
+                        ? 'দাখিল কৰাৰ লগে লগে ৮৮৭৬৮২৪৪২৪ নম্বৰত হোৱাটছএপ মুকলি হ’ব আৰু স্ক্ৰীণত টিকটৰ প্ৰিভিউ ওলাব।'
+                        : 'Directly opens WhatsApp (+91 88768 24424) & instantly shows your official ticket preview.'}
+                    </span>
                   </p>
                 </div>
               </form>
@@ -631,13 +763,22 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full py-3.5 px-6 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-blue-700 via-blue-800 to-emerald-600 hover:from-blue-600 hover:to-emerald-500 text-white font-extrabold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-98"
                   >
-                    <GraduationCap className="w-4 h-4" />
-                    <span>{lang === 'as' ? 'নামভৰ্তিৰ বাবে আবেদন কৰক' : 'Apply for Admission & Reserve Seat'}</span>
+                    <MessageCircle className="w-5 h-5 text-emerald-300" />
+                    <span>
+                      {lang === 'as'
+                        ? 'নামভৰ্তি টিকট বনাওক আৰু হোৱাটছএপত প্ৰেৰণ কৰক (8876824424)'
+                        : 'Generate Admission Ticket & Send to WhatsApp (8876824424)'}
+                    </span>
                   </button>
-                  <p className="text-[11px] text-slate-500 text-center mt-2">
-                    🎓 Verified curriculum certificate issued upon course completion. 1-to-1 computer lab access.
+                  <p className="text-[11px] text-slate-500 text-center mt-2 flex items-center justify-center gap-1">
+                    <span>⚡</span>
+                    <span>
+                      {lang === 'as'
+                        ? 'দাখিল কৰাৰ লগে লগে ৮৮৭৬৮২৪৪২৪ নম্বৰত হোৱাটছএপ মুকলি হ’ব আৰু স্ক্ৰীণত টিকটৰ প্ৰিভিউ ওলাব।'
+                        : 'Directly opens WhatsApp (+91 88768 24424) & instantly shows your official ticket preview.'}
+                    </span>
                   </p>
                 </div>
               </form>
@@ -698,10 +839,10 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-slate-400">{rec.submittedAt}</span>
                     <button
-                      onClick={() => openWhatsAppSubmission(rec, BUSINESS_CONTACTS.phone1)}
-                      className="px-2 py-1 rounded-md bg-[#25D366] text-slate-950 font-bold text-[10px] hover:bg-[#20ba59]"
+                      onClick={() => dispatchToWhatsApp(rec, BUSINESS_CONTACTS.phone1)}
+                      className="px-2.5 py-1 rounded-md bg-[#25D366] text-slate-950 font-bold text-[10px] hover:bg-[#20ba59] cursor-pointer"
                     >
-                      WhatsApp
+                      WhatsApp (8876824424)
                     </button>
                   </div>
                 </div>

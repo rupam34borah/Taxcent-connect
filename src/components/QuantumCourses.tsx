@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ActiveTab, Language, CourseItem } from '../types';
 import { QUANTUM_COURSES, BUSINESS_CONTACTS } from '../data/content';
 import { Monitor, CheckCircle2, Clock, Award, BookOpen, MessageCircle, ArrowRight, Sparkles, Users, Calendar } from 'lucide-react';
@@ -16,6 +16,23 @@ export const QuantumCourses: React.FC<QuantumCoursesProps> = ({
   onSelectCourseForAdmission,
 }) => {
   const [selectedCourse, setSelectedCourse] = useState<CourseItem>(QUANTUM_COURSES[0]);
+  const [isSyllabusHighlighted, setIsSyllabusHighlighted] = useState(false);
+  const syllabusRef = useRef<HTMLDivElement>(null);
+
+  const handleSelectCourse = (course: CourseItem) => {
+    setSelectedCourse(course);
+    setIsSyllabusHighlighted(true);
+
+    setTimeout(() => {
+      if (syllabusRef.current) {
+        syllabusRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+
+    setTimeout(() => {
+      setIsSyllabusHighlighted(false);
+    }, 1800);
+  };
 
   const handleWhatsAppCourseInquiry = (course: CourseItem) => {
     const courseTitle = lang === 'as' ? course.titleAs : course.titleEn;
@@ -97,7 +114,7 @@ export const QuantumCourses: React.FC<QuantumCoursesProps> = ({
                 return (
                   <div
                     key={course.id}
-                    onClick={() => setSelectedCourse(course)}
+                    onClick={() => handleSelectCourse(course)}
                     className={`rounded-2xl p-5 border transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-white border-blue-600 shadow-md ring-2 ring-blue-500/20'
@@ -127,13 +144,18 @@ export const QuantumCourses: React.FC<QuantumCoursesProps> = ({
                       {lang === 'as' ? course.overviewAs : course.overviewEn}
                     </p>
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-2 border-t border-slate-100">
-                      <span className="flex items-center gap-1 font-semibold text-slate-700">
-                        <Clock className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{course.duration}</span>
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 pt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1 font-semibold text-slate-700">
+                          <Clock className="w-3.5 h-3.5 text-blue-600" />
+                          <span>{course.duration}</span>
+                        </span>
+                        <span aria-hidden="true" className="text-slate-300">·</span>
+                        <span>{course.level}</span>
+                      </div>
+                      <span className="text-blue-700 font-bold hover:text-blue-950 py-0.5 px-2 rounded-md bg-blue-50 text-[11px]">
+                        {lang === 'as' ? 'পাঠ্যক্ৰম চাওক' : 'View Syllabus'}
                       </span>
-                      <span aria-hidden="true" className="text-slate-300">·</span>
-                      <span>{course.level}</span>
                     </div>
                   </div>
                 );
@@ -142,8 +164,12 @@ export const QuantumCourses: React.FC<QuantumCoursesProps> = ({
           </div>
 
           {/* Selected Course Deep Dive Inspector */}
-          <div className="lg:col-span-5 sticky top-20">
-            <div className="rounded-2xl bg-white p-6 border border-slate-200 shadow-md space-y-6">
+          <div ref={syllabusRef} id="course-syllabus-details" className="lg:col-span-5 sticky top-20 scroll-mt-20 sm:scroll-mt-24">
+            <div className={`rounded-2xl bg-white p-6 border transition-all duration-300 space-y-6 ${
+              isSyllabusHighlighted
+                ? 'border-blue-500 ring-4 ring-blue-400/40 shadow-xl scale-[1.01] bg-blue-50/20'
+                : 'border-slate-200 shadow-md'
+            }`}>
               {/* Card Title & Badge */}
               <div className="pb-4 border-b border-slate-100">
                 <div className="flex items-center justify-between mb-1">

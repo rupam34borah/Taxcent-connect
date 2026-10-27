@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ActiveTab, Language, CSCServiceItem } from '../types';
 import { CSC_SERVICES, BUSINESS_CONTACTS } from '../data/content';
 import { Landmark, CheckCircle2, ShieldAlert, FileText, ExternalLink, MessageCircle, Phone, ArrowRight, Printer } from 'lucide-react';
@@ -16,6 +16,23 @@ export const CSCServices: React.FC<CSCServicesProps> = ({
   onSelectServiceForEnquiry,
 }) => {
   const [selectedService, setSelectedService] = useState<CSCServiceItem>(CSC_SERVICES[0]);
+  const [isDetailsHighlighted, setIsDetailsHighlighted] = useState(false);
+  const detailsRef = useRef<HTMLDivElement>(null);
+
+  const handleSelectService = (service: CSCServiceItem) => {
+    setSelectedService(service);
+    setIsDetailsHighlighted(true);
+
+    setTimeout(() => {
+      if (detailsRef.current) {
+        detailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+
+    setTimeout(() => {
+      setIsDetailsHighlighted(false);
+    }, 1800);
+  };
 
   const handleWhatsAppCSC = (service: CSCServiceItem) => {
     const serviceName = lang === 'as' ? service.nameAs : service.nameEn;
@@ -111,10 +128,10 @@ export const CSCServices: React.FC<CSCServicesProps> = ({
                 return (
                   <div
                     key={service.id}
-                    onClick={() => setSelectedService(service)}
+                    onClick={() => handleSelectService(service)}
                     className={`rounded-2xl p-5 border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-white border-emerald-600 shadow-md ring-2 ring-emerald-500/20'
+                        ? 'bg-white border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
                         : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs'
                     }`}
                   >
@@ -145,9 +162,9 @@ export const CSCServices: React.FC<CSCServicesProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedService(service);
+                          handleSelectService(service);
                         }}
-                        className="text-emerald-700 font-semibold hover:underline"
+                        className="text-emerald-700 font-bold hover:text-emerald-950 py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition-colors"
                       >
                         {lang === 'as' ? 'নথি আৰু বিৱৰণ' : 'View Requirements'}
                       </button>
@@ -159,8 +176,12 @@ export const CSCServices: React.FC<CSCServicesProps> = ({
           </div>
 
           {/* Service Details & Document Checklist Box */}
-          <div className="lg:col-span-5 sticky top-20">
-            <div className="rounded-2xl bg-white p-6 border border-slate-200 shadow-md space-y-5">
+          <div ref={detailsRef} id="csc-service-requirements" className="lg:col-span-5 sticky top-20 scroll-mt-20 sm:scroll-mt-24">
+            <div className={`rounded-2xl bg-white p-6 border transition-all duration-300 space-y-5 ${
+              isDetailsHighlighted
+                ? 'border-emerald-500 ring-4 ring-emerald-400/40 shadow-xl scale-[1.01] bg-emerald-50/20'
+                : 'border-slate-200 shadow-md'
+            }`}>
               <div className="pb-4 border-b border-slate-100">
                 <span className="text-xs font-mono font-medium text-emerald-700 uppercase">
                   Service Application Requirements

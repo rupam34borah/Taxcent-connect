@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ActiveTab, Language, ServiceItem } from '../types';
 import { TAXCENT_SERVICES, BUSINESS_CONTACTS } from '../data/content';
 import { FileText, CheckCircle2, ChevronRight, Phone, MessageSquare, Clock, FileCheck, Calculator, ArrowRight } from 'lucide-react';
@@ -16,6 +16,24 @@ export const TaxServices: React.FC<TaxServicesProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeChecklistService, setActiveChecklistService] = useState<ServiceItem | null>(TAXCENT_SERVICES[0]);
+  const [isChecklistHighlighted, setIsChecklistHighlighted] = useState(false);
+  const checklistRef = useRef<HTMLDivElement>(null);
+
+  const handleViewChecklist = (service: ServiceItem) => {
+    setActiveChecklistService(service);
+    setIsChecklistHighlighted(true);
+
+    // Smooth scroll down to required documents checklist section
+    setTimeout(() => {
+      if (checklistRef.current) {
+        checklistRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+
+    setTimeout(() => {
+      setIsChecklistHighlighted(false);
+    }, 1800);
+  };
   
   // Quick Income Tax Estimator helper state
   const [incomeInput, setIncomeInput] = useState<string>('750000');
@@ -209,7 +227,7 @@ export const TaxServices: React.FC<TaxServicesProps> = ({
                 return (
                   <div
                     key={service.id}
-                    onClick={() => setActiveChecklistService(service)}
+                    onClick={() => handleViewChecklist(service)}
                     className={`rounded-2xl p-5 border transition-all cursor-pointer flex flex-col justify-between ${
                       isSelected
                         ? 'bg-white border-sky-500 shadow-md ring-2 ring-sky-500/20'
@@ -246,12 +264,13 @@ export const TaxServices: React.FC<TaxServicesProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActiveChecklistService(service);
+                          handleViewChecklist(service);
                         }}
-                        className="text-xs font-semibold text-slate-700 hover:text-sky-700 flex items-center gap-1"
+                        className="text-xs font-semibold text-sky-800 hover:text-sky-950 flex items-center gap-1.5 group/btn cursor-pointer py-1 px-2 rounded-lg bg-sky-50 hover:bg-sky-100 transition-colors"
+                        title={lang === 'as' ? 'প্ৰয়োজনীয় নথিপত্ৰৰ তালিকালৈ যাওক' : 'Scroll down to required document checklist'}
                       >
-                        <FileCheck className="w-3.5 h-3.5 text-sky-600" />
-                        <span>{lang === 'as' ? 'নথি চাওক' : 'View Checklist'}</span>
+                        <FileCheck className="w-3.5 h-3.5 text-sky-600 group-hover/btn:scale-110 transition-transform" />
+                        <span className="font-bold">{lang === 'as' ? 'নথি চাওক' : 'View Checklist'}</span>
                       </button>
 
                       <button
@@ -272,9 +291,13 @@ export const TaxServices: React.FC<TaxServicesProps> = ({
           </div>
 
           {/* Right Column: Active Document Checklist & Contact Card */}
-          <div className="lg:col-span-4 sticky top-20 space-y-6">
+          <div ref={checklistRef} id="required-documents-checklist" className="lg:col-span-4 sticky top-20 space-y-6 scroll-mt-20 sm:scroll-mt-24">
             {activeChecklistService && (
-              <div className="rounded-2xl bg-white p-6 border border-slate-200 shadow-md">
+              <div className={`rounded-2xl bg-white p-6 border transition-all duration-300 ${
+                isChecklistHighlighted
+                  ? 'border-sky-500 ring-4 ring-sky-400/40 shadow-xl scale-[1.01] bg-sky-50/20'
+                  : 'border-slate-200 shadow-md'
+              }`}>
                 <div className="flex items-center gap-2 pb-3 border-b border-slate-100 mb-4">
                   <FileCheck className="w-5 h-5 text-sky-600" />
                   <h3 className="font-bold text-slate-900 text-sm">
