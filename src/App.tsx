@@ -16,7 +16,7 @@ import { MobileNav } from './components/MobileNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { FreeDeploymentModal } from './components/FreeDeploymentModal';
 import { AcademicPortal } from './components/AcademicPortal';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './components/AuthModal';
 
 const VALID_TABS: ActiveTab[] = [
@@ -61,6 +61,7 @@ const getInitialLang = (): Language => {
 };
 
 function MainApp() {
+  const { role } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
   const [lang, setLang] = useState<Language>(getInitialLang);
   const [selectedService, setSelectedService] = useState<string>('');
@@ -215,7 +216,7 @@ function MainApp() {
         {activeTab === 'academic' && (
           <AcademicPortal
             lang={lang}
-            initialSubTab="student"
+            initialSubTab={role === 'student' ? 'student' : (role === 'staff' || role === 'admin') ? 'staff' : 'verify'}
           />
         )}
 

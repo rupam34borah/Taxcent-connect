@@ -51,7 +51,8 @@ import {
   Database,
   ChevronRight,
   Send,
-  HelpCircle
+  HelpCircle,
+  ShieldAlert
 } from 'lucide-react';
 
 interface StaffAcademicDashboardProps {
@@ -550,6 +551,23 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
   const pendingCertificatesCount = documents.filter(d => d.approvalStatus === 'pending').length;
   const todayStudentAttCount = attendance.filter(a => a.personType === 'student' && a.date === attendanceDate && a.status === 'present').length;
   const todayStaffAttCount = attendance.filter(a => a.personType === 'staff' && a.date === attendanceDate && a.status === 'present').length;
+  if (role === 'student') {
+    return (
+      <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-8 sm:p-12 text-center max-w-2xl mx-auto space-y-5 shadow-2xl">
+        <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl sm:text-2xl font-bold text-white">
+            Access Restricted: Student Account
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
+            You are signed in with a Student ID ({user?.studentIdCode || user?.name}). Students do not have authorization to view, enter, or correct institutional records or access the staff portal.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

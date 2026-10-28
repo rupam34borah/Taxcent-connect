@@ -37,7 +37,8 @@ import {
   FileCheck2,
   FileSpreadsheet,
   Search,
-  Filter
+  Filter,
+  ShieldAlert
 } from 'lucide-react';
 
 interface StudentAcademicDashboardProps {
@@ -235,6 +236,25 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
   const certificatesList = documents.filter(d => d.documentType === 'certificate');
   const marksheetDocs = documents.filter(d => d.documentType === 'marksheet');
 
+  // Hard block staff from student portal
+  if (role === 'staff') {
+    return (
+      <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-8 sm:p-12 text-center max-w-2xl mx-auto space-y-5 shadow-2xl">
+        <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl sm:text-2xl font-bold text-white">
+            Staff Access Restricted
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
+            Staff accounts are authorized for student administration, batch attendance, marks evaluations, and certificate draft submissions. Staff cannot access personal student portals.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Student Session Card */}
@@ -246,14 +266,14 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                {currentStudent?.studentIdCode || 'QLI-STU-2026-001'}
+                {currentStudent?.studentIdCode || user?.studentIdCode || 'QLI-STU-2026-001'}
               </span>
               <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
                 Active Enrolment
               </span>
             </div>
             <h2 className="text-xl font-extrabold text-white mt-1">
-              {currentStudent?.fullName || 'Rahul Sharma'}
+              {currentStudent?.fullName || user?.name || 'Rahul Sharma'}
             </h2>
             <p className="text-xs text-slate-400">
               {currentStudent?.enrolledCourse} &bull; Batch: {currentStudent?.batchCode || 'DCA-2026-M1'}
@@ -261,10 +281,10 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
           </div>
         </div>
 
-        {/* Demo Switcher for Preview (if multiple test accounts) */}
-        {students.length > 1 && (
+        {/* Admin Only Preview Switcher (Students NEVER see this switcher) */}
+        {role === 'admin' && students.length > 1 && (
           <div className="flex items-center gap-2 bg-slate-950/80 p-2 rounded-xl border border-slate-800 self-start md:self-auto">
-            <span className="text-[11px] text-slate-400 font-semibold">Switch Account:</span>
+            <span className="text-[11px] text-amber-400 font-semibold">Admin Student Preview:</span>
             <select
               value={activeStudentId}
               onChange={async e => {

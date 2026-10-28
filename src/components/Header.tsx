@@ -204,10 +204,22 @@ export const Header: React.FC<HeaderProps> = ({
                     <GraduationCap className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
                     <div>
                       <div className="text-xs font-bold text-white">
-                        {lang === 'as' ? 'শৈক্ষিক পৰ্টেল' : 'Quantum Academic Portal'}
+                        {user?.role === 'admin'
+                          ? (lang === 'as' ? 'প্ৰশাসন কন্স’ল (Admin Console)' : 'Admin Console (Academic)')
+                          : user?.role === 'staff'
+                          ? (lang === 'as' ? 'কৰ্মচাৰী কন্স’ল (Staff Console)' : 'Staff Console (Data Entry)')
+                          : user?.role === 'student'
+                          ? (lang === 'as' ? 'মোৰ শৈক্ষিক পৰ্টেল' : 'My Student Portal')
+                          : (lang === 'as' ? 'শৈক্ষিক পৰ্টেল' : 'Quantum Academic Portal')}
                       </div>
                       <div className="text-[10px] text-slate-400">
-                        {lang === 'as' ? 'ছাত্ৰ মাৰ্কশ্বীট আৰু প্ৰৱেশাধিকাৰ' : 'Student marksheets & staff console'}
+                        {user?.role === 'admin'
+                          ? 'Executive dashboard, rosters & approvals'
+                          : user?.role === 'staff'
+                          ? 'Admissions, batch attendance & marks entry'
+                          : user?.role === 'student'
+                          ? 'My profile, results, certificates & mock tests'
+                          : 'Student marksheets & staff console'}
                       </div>
                     </div>
                   </button>
