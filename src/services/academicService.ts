@@ -363,13 +363,6 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     isPortalGenerated: true,
     batchCode: 'DCA-2026-M1',
   },
-    approvedBy: 'Prof. Debajit Saikia (Admin)',
-    approvedAt: '2026-08-15T10:20:00Z',
-    createdBy: 'stf-002',
-    createdByName: 'Ananya Dutta',
-    createdAt: '2026-08-15T10:15:00Z',
-    updatedAt: '2026-08-15T10:15:00Z',
-  },
   {
     id: 'doc-003',
     studentId: 'stu-002',
