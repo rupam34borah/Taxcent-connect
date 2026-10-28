@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ActiveTab, Language } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
 import { 
@@ -19,7 +19,8 @@ import {
   LogIn,
   LogOut,
   User,
-  Lock
+  Lock,
+  ChevronDown
 } from 'lucide-react';
 import { BUSINESS_CONTACTS } from '../data/content';
 import { useAuth } from '../context/AuthContext';
@@ -42,18 +43,34 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenQuickCallback,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, isAuthenticated, logout, openAuthModal } = useAuth();
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setMoreDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleNavClick = (tab: ActiveTab) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
+    setMoreDropdownOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const isMoreActive = ['tax', 'estimator', 'academic', 'verify', 'contact', 'about'].includes(activeTab);
+
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#0a2540] text-white border-b border-sky-950/60 shadow-md w-full overflow-hidden">
-        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 h-16 flex items-center justify-between gap-1.5 sm:gap-4 md:gap-8">
+      <header className="sticky top-0 z-40 bg-[#0a2540] text-white border-b border-sky-950/60 shadow-md w-full">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
           {/* Zone 1: Brand Wordmark */}
           <button
             onClick={() => handleNavClick('home')}
@@ -72,8 +89,9 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </button>
 
-          {/* Zone 2: Navigation Links (Desktop) */}
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-200">
+          {/* Zone 2: Navigation Links (Desktop: Home, CSC, Computer Courses + Dropdown for other items) */}
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-sm font-medium text-slate-200 shrink-0">
+            {/* 1. Home */}
             <button
               onClick={() => handleNavClick('home')}
               className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
@@ -84,68 +102,158 @@ export const Header: React.FC<HeaderProps> = ({
             >
               {lang === 'as' ? 'মুখ্যপৃষ্ঠা' : 'Home'}
             </button>
-            <button
-              onClick={() => handleNavClick('tax')}
-              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
-                activeTab === 'tax'
-                  ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
-                  : 'hover:text-white'
-              }`}
-            >
-              {lang === 'as' ? 'কৰ আৰু একাউণ্ট' : 'Tax & Accounting'}
-            </button>
-            <button
-              onClick={() => handleNavClick('estimator')}
-              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'estimator'
-                  ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
-                  : 'hover:text-white'
-              }`}
-            >
-              <Calculator className="w-3.5 h-3.5 text-sky-400" />
-              <span>{lang === 'as' ? 'কৰ কেলকুলেটৰ' : 'Quick Tax Estimator'}</span>
-            </button>
-            <button
-              onClick={() => handleNavClick('courses')}
-              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
-                activeTab === 'courses'
-                  ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
-                  : 'hover:text-white'
-              }`}
-            >
-              {lang === 'as' ? 'কম্পিউটাৰ পাঠ্যক্ৰম' : 'Computer Courses'}
-            </button>
+
+            {/* 2. CSC Citizen Services */}
             <button
               onClick={() => handleNavClick('csc')}
-              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
+              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'csc'
                   ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
                   : 'hover:text-white'
               }`}
             >
-              {lang === 'as' ? 'চিএছচি সেৱা' : 'CSC Citizen Services'}
+              <Landmark className="w-4 h-4 text-emerald-400" />
+              <span>{lang === 'as' ? 'চিএছচি সেৱা' : 'CSC Citizen Services'}</span>
             </button>
+
+            {/* 3. Computer Courses */}
             <button
-              onClick={() => handleNavClick('verify')}
+              onClick={() => handleNavClick('courses')}
               className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'verify' || activeTab === 'academic'
+                activeTab === 'courses'
                   ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
                   : 'hover:text-white'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-              <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষণ' : 'Verify Certificate'}</span>
+              <Monitor className="w-4 h-4 text-sky-400" />
+              <span>{lang === 'as' ? 'কম্পিউটাৰ পাঠ্যক্ৰম' : 'Computer Courses'}</span>
             </button>
-            <button
-              onClick={() => handleNavClick('contact')}
-              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
-                activeTab === 'contact'
-                  ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
-                  : 'hover:text-white'
-              }`}
-            >
-              {lang === 'as' ? 'ঠিকনা আৰু যোগাযোগ' : 'Contact & Location'}
-            </button>
+
+            {/* 4. Drop-down Menu for other items */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setMoreDropdownOpen(!moreDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap text-xs font-bold ${
+                  isMoreActive
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40 shadow-sm'
+                    : moreDropdownOpen
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
+                }`}
+                aria-expanded={moreDropdownOpen}
+                aria-haspopup="true"
+              >
+                <span>{lang === 'as' ? 'অধিক সেৱা' : 'More Services'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${moreDropdownOpen ? 'rotate-180 text-sky-400' : 'text-slate-400'}`} />
+              </button>
+
+              {/* Floating Dropdown Panel */}
+              {moreDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-72 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-sky-800/80 shadow-2xl p-2 z-50 animate-fade-in space-y-1">
+                  {/* Tax & Accounting */}
+                  <button
+                    onClick={() => handleNavClick('tax')}
+                    className={`w-full flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
+                      activeTab === 'tax'
+                        ? 'bg-sky-500/20 text-white border border-sky-500/30'
+                        : 'hover:bg-slate-800/80 text-slate-200'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-white">
+                        {lang === 'as' ? 'কৰ আৰু একাউণ্ট' : 'Tax & Accounting'}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {lang === 'as' ? 'আইটিআৰ, জিএছটি আৰু পঞ্জীয়ন' : 'ITR, GST, TDS & Consulting'}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Quick Tax Estimator */}
+                  <button
+                    onClick={() => handleNavClick('estimator')}
+                    className={`w-full flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
+                      activeTab === 'estimator'
+                        ? 'bg-sky-500/20 text-white border border-sky-500/30'
+                        : 'hover:bg-slate-800/80 text-slate-200'
+                    }`}
+                  >
+                    <Calculator className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>{lang === 'as' ? 'দ্ৰুত কৰ কেলকুলেটৰ' : 'Quick Tax Estimator'}</span>
+                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">AY 27-28</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {lang === 'as' ? 'নতুন আৰু পুৰণি কৰ তুলনা' : 'New vs Old tax regime comparison'}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Student & Staff Academic Portal */}
+                  <button
+                    onClick={() => handleNavClick('academic')}
+                    className={`w-full flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
+                      activeTab === 'academic'
+                        ? 'bg-sky-500/20 text-white border border-sky-500/30'
+                        : 'hover:bg-slate-800/80 text-slate-200'
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-white">
+                        {lang === 'as' ? 'শৈক্ষিক পৰ্টেল' : 'Quantum Academic Portal'}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {lang === 'as' ? 'ছাত্ৰ মাৰ্কশ্বীট আৰু প্ৰৱেশাধিকাৰ' : 'Student marksheets & staff console'}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Verify Certificate */}
+                  <button
+                    onClick={() => handleNavClick('verify')}
+                    className={`w-full flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
+                      activeTab === 'verify'
+                        ? 'bg-sky-500/20 text-white border border-sky-500/30'
+                        : 'hover:bg-slate-800/80 text-slate-200'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-white">
+                        {lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষণ' : 'Verify Certificate'}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {lang === 'as' ? 'প্ৰমাণপত্ৰৰ নিৰীক্ষণ (ৰাজহুৱা)' : 'Public credential verification'}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Contact & Location */}
+                  <button
+                    onClick={() => handleNavClick('contact')}
+                    className={`w-full flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
+                      activeTab === 'contact'
+                        ? 'bg-sky-500/20 text-white border border-sky-500/30'
+                        : 'hover:bg-slate-800/80 text-slate-200'
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-white">
+                        {lang === 'as' ? 'ঠিকনা আৰু যোগাযোগ' : 'Contact & Location'}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {lang === 'as' ? 'ৰণবাৰী বজাৰ, এন.এইচ-১৫' : 'Ranabari Market, NH-15'}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* Zone 3: Primary Action Zone */}
@@ -161,19 +269,6 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
               <span className="font-bold text-[11px] sm:text-xs">{lang === 'en' ? 'অসমীয়া' : 'EN'}</span>
-            </button>
-
-            {/* Verify Certificate CTA */}
-            <button
-              onClick={() => handleNavClick('verify')}
-              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap shrink-0 ${
-                activeTab === 'verify'
-                  ? 'bg-amber-400 text-slate-950 font-extrabold ring-2 ring-amber-300'
-                  : 'bg-sky-950/90 hover:bg-sky-900 border border-sky-600/60 text-sky-200'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-              <span>{lang === 'as' ? 'প্ৰমাণপত্ৰ পৰীক্ষণ' : 'Verify Certificate'}</span>
             </button>
 
             {/* Desktop Only Login / Authenticated User Pill (Header only for desktop version) */}
@@ -194,7 +289,7 @@ export const Header: React.FC<HeaderProps> = ({
                   title={`${user?.name} (${user?.role}) - Open Portal`}
                 >
                   <span className={`w-2 h-2 rounded-full ${user?.role === 'admin' ? 'bg-amber-400' : user?.role === 'staff' ? 'bg-sky-400' : 'bg-emerald-400'}`} />
-                  <span className="max-w-[110px] truncate">{user?.name.split(' ')[0]}</span>
+                  <span className="max-w-[100px] truncate">{user?.name.split(' ')[0]}</span>
                   <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-sky-900 text-sky-300 border border-sky-700">
                     {user?.role}
                   </span>
