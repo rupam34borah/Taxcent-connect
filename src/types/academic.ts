@@ -129,6 +129,10 @@ export interface StudentMarkRecord {
   enteredBy: string;
   approvedBy?: string;
   updatedAt: string;
+  certificateId?: string;
+  certificateNumber?: string;
+  answerSheetFileName?: string;
+  answerSheetFileData?: string;
 }
 
 export interface AcademicDocument {
@@ -159,6 +163,20 @@ export interface AcademicDocument {
   createdAt: string;
   updatedAt: string;
   localFileData?: string;
+  // Portal Generated & Answer Sheet Fields
+  isPortalGenerated?: boolean;
+  assessmentId?: string;
+  assessmentTitle?: string;
+  marksObtained?: number;
+  maxScore?: number;
+  percentage?: number;
+  grade?: string;
+  evaluatorRemarks?: string;
+  batchCode?: string;
+  examAnswerSheetFileName?: string;
+  examAnswerSheetFileData?: string;
+  examAnswerSheetMimeType?: string;
+  courseDurationMonths?: number;
 }
 
 export interface LearningResourceItem {

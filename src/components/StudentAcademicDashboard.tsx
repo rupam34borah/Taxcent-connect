@@ -38,8 +38,11 @@ import {
   FileSpreadsheet,
   Search,
   Filter,
-  ShieldAlert
+  ShieldAlert,
+  Printer,
+  Paperclip
 } from 'lucide-react';
+import { downloadCertificatePdf, printCertificate } from '../utils/certificateGenerator';
 
 interface StudentAcademicDashboardProps {
   lang: Language;
@@ -496,6 +499,30 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
                     </div>
                   )}
 
+                  {(() => {
+                    const linkedCert = documents.find(d => d.certificateNumber === mrk.certificateNumber || d.assessmentId === mrk.assessmentId);
+                    const sheetName = mrk.answerSheetFileName || linkedCert?.examAnswerSheetFileName;
+                    const sheetData = mrk.answerSheetFileData || linkedCert?.examAnswerSheetFileData;
+                    if (!sheetName) return null;
+                    return (
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 text-[11px]">
+                        <div className="flex items-center gap-1.5 text-amber-400 font-medium truncate max-w-[200px]">
+                          <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Answer Sheet: {sheetName}</span>
+                        </div>
+                        {sheetData && (
+                          <a
+                            href={sheetData}
+                            download={sheetName}
+                            className="text-sky-400 hover:text-sky-300 font-semibold underline shrink-0 cursor-pointer"
+                          >
+                            View Paper
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
                     <span>Evaluated by: {mrk.enteredBy}</span>
                     <span className="text-emerald-400 font-semibold flex items-center gap-1">
@@ -589,18 +616,38 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
                     </div>
                   )}
 
-                  <div className="pt-2 flex items-center justify-between border-t border-slate-800">
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-800 flex-wrap gap-2">
                     <span className="text-[11px] text-slate-400">
                       Approved: {cert.approvedBy || 'Academic Administration'}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDocPreview(cert)}
-                      className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>View & Download</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => downloadCertificatePdf(cert)}
+                        title="Download Print-Ready PDF Certificate"
+                        className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download PDF</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => printCertificate(cert)}
+                        title="Print Certificate (A4 Landscape)"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Print</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDocPreview(cert)}
+                        title="Preview Certificate"
+                        className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1117,19 +1164,27 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
               <span className="text-slate-400">
                 Official Credential Issued by Quantum Learning Institute
               </span>
-              <div className="flex gap-2">
-                <a
-                  href={previewUrl || '#'}
-                  download={previewDoc.fileName}
-                  className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => downloadCertificatePdf(previewDoc)}
+                  className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow-md text-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download Verified Document</span>
-                </a>
+                  <span>Download Official PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => printCertificate(previewDoc)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow-md text-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Certificate</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setPreviewDoc(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer text-xs"
                 >
                   Close
                 </button>

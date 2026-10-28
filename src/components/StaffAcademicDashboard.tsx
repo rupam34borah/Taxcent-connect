@@ -21,6 +21,10 @@ import {
 import { academicService } from '../services/academicService';
 import { useAuth } from '../context/AuthContext';
 import { 
+  downloadCertificatePdf, 
+  printCertificate 
+} from '../utils/certificateGenerator';
+import { 
   LayoutDashboard,
   Users,
   UserPlus,
@@ -52,7 +56,11 @@ import {
   ChevronRight,
   Send,
   HelpCircle,
-  ShieldAlert
+  ShieldAlert,
+  Printer,
+  Paperclip,
+  Sparkles,
+  UploadCloud
 } from 'lucide-react';
 
 interface StaffAcademicDashboardProps {
@@ -148,6 +156,28 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
   // Form states for Assessment & Marks
   const [selectedAssessmentForMarks, setSelectedAssessmentForMarks] = useState<AssessmentItem | null>(null);
   const [currentMarksInput, setCurrentMarksInput] = useState<Record<string, { marks: number; remarks: string }>>({});
+
+  // Unified Exam Evaluation & Certificate Submission
+  const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
+  const [unifiedForm, setUnifiedForm] = useState({
+    studentId: '',
+    courseName: 'Diploma in Computer Application (DCA)',
+    batchId: '',
+    batchCode: '',
+    assessmentTitle: 'Final Comprehensive Practical & Theory Examination',
+    examDate: new Date().toISOString().split('T')[0],
+    maxScore: 100,
+    marksObtained: 85,
+    remarks: 'Satisfactorily cleared all practical modules and written examination.',
+    certificateNumber: '',
+    issueDate: new Date().toISOString().split('T')[0],
+  });
+  const [answerSheetFile, setAnswerSheetFile] = useState<File | null>(null);
+  const answerSheetFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Answer Sheet Viewer State
+  const [viewingAnswerSheetDoc, setViewingAnswerSheetDoc] = useState<AcademicDocument | null>(null);
+  const [viewingAnswerSheetUrl, setViewingAnswerSheetUrl] = useState<string | null>(null);
 
   // Operator Identification
   const operatorName = user?.name || (isAdmin ? 'Prof. Debajit Saikia (Admin)' : 'Ananya Dutta (Staff)');
@@ -530,6 +560,104 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
     setPreviewDoc(doc);
     const url = await academicService.getSecureDocumentUrl(doc);
     setPreviewUrl(url);
+  };
+
+  // ------------------------------------------------------------------
+  // UNIFIED EXAM & CERTIFICATE ACTION HANDLERS
+  // ------------------------------------------------------------------
+  const handleOpenUnifiedModal = async (preselectedStudentId?: string) => {
+    const targetStudent = students.find(s => s.id === preselectedStudentId) || students[0];
+    const targetCourse = targetStudent?.enrolledCourse || 'Diploma in Computer Application (DCA)';
+    const suggestedCertNo = await academicService.getNextCertificateNumber(targetCourse);
+
+    setUnifiedForm({
+      studentId: targetStudent?.id || '',
+      courseName: targetCourse,
+      batchId: targetStudent?.batchId || '',
+      batchCode: targetStudent?.batchCode || '',
+      assessmentTitle: `${targetCourse} — Final Comprehensive Examination`,
+      examDate: new Date().toISOString().split('T')[0],
+      maxScore: 100,
+      marksObtained: 85,
+      remarks: 'Satisfactorily cleared all practical modules and written examination.',
+      certificateNumber: suggestedCertNo,
+      issueDate: new Date().toISOString().split('T')[0],
+    });
+    setAnswerSheetFile(null);
+    if (answerSheetFileInputRef.current) answerSheetFileInputRef.current.value = '';
+    setIsUnifiedModalOpen(true);
+  };
+
+  const handleUnifiedStudentChange = async (studentId: string) => {
+    const targetStudent = students.find(s => s.id === studentId);
+    if (!targetStudent) return;
+    const targetCourse = targetStudent.enrolledCourse || 'Diploma in Computer Application (DCA)';
+    const suggestedCertNo = await academicService.getNextCertificateNumber(targetCourse);
+    setUnifiedForm(prev => ({
+      ...prev,
+      studentId,
+      courseName: targetCourse,
+      batchId: targetStudent.batchId || '',
+      batchCode: targetStudent.batchCode || '',
+      assessmentTitle: `${targetCourse} — Final Comprehensive Examination`,
+      certificateNumber: suggestedCertNo,
+    }));
+  };
+
+  const handleSaveUnifiedSubmission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unifiedForm.studentId) {
+      alert('Please select a student.');
+      return;
+    }
+    if (unifiedForm.marksObtained < 0 || unifiedForm.marksObtained > unifiedForm.maxScore) {
+      alert(`Marks obtained (${unifiedForm.marksObtained}) must be between 0 and maximum marks (${unifiedForm.maxScore}).`);
+      return;
+    }
+
+    const res = await academicService.submitUnifiedExamEvaluation({
+      studentId: unifiedForm.studentId,
+      courseName: unifiedForm.courseName,
+      batchId: unifiedForm.batchId,
+      batchCode: unifiedForm.batchCode,
+      assessmentTitle: unifiedForm.assessmentTitle,
+      examDate: unifiedForm.examDate,
+      maxScore: Number(unifiedForm.maxScore),
+      marksObtained: Number(unifiedForm.marksObtained),
+      remarks: unifiedForm.remarks,
+      certificateNumber: unifiedForm.certificateNumber,
+      issueDate: unifiedForm.issueDate,
+      answerSheetFile: answerSheetFile,
+      submittedBy: operatorName,
+      isAdmin,
+    });
+
+    if (res.success && res.document) {
+      setIsUnifiedModalOpen(false);
+      setAnswerSheetFile(null);
+      await loadAllData();
+      alert(
+        isAdmin 
+          ? `Marks recorded and official certificate ${res.document.certificateNumber} issued! PDF is ready to print.` 
+          : `Marks & draft certificate ${res.document.certificateNumber} submitted with answer sheet for Admin review.`
+      );
+    } else {
+      alert(res.error || 'Failed to submit exam evaluation.');
+    }
+  };
+
+  const handleOpenAnswerSheet = async (doc: AcademicDocument) => {
+    setViewingAnswerSheetDoc(doc);
+    const url = await academicService.getSecureAnswerSheetUrl(doc);
+    setViewingAnswerSheetUrl(url || doc.localFileData || null);
+  };
+
+  const handleDownloadPdf = (doc: AcademicDocument) => {
+    downloadCertificatePdf(doc);
+  };
+
+  const handlePrintDoc = (doc: AcademicDocument) => {
+    printCertificate(doc);
   };
 
   // ------------------------------------------------------------------
@@ -1386,9 +1514,17 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
             <div>
               <h2 className="text-lg font-bold text-white">Examinations, Marks & Marksheet Approvals</h2>
               <p className="text-xs text-slate-400">
-                Staff enters marks validated against max score. Admin reviews, approves and publishes results to student portal.
+                Submit student exam scores, attach evaluated answer sheets, and generate draft certificates in one consolidated flow.
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => handleOpenUnifiedModal()}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md self-start sm:self-auto"
+            >
+              <Sparkles className="w-4 h-4 text-slate-950" />
+              <span>{isAdmin ? 'Record Marks & Issue Certificate' : 'Unified Exam & Certificate Entry'}</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1466,17 +1602,28 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
             <div>
               <h2 className="text-lg font-bold text-white">Authoritative Certificates & Marksheets Registry</h2>
               <p className="text-xs text-slate-400">
-                Staff creates draft certificate records. Admin formally reviews, approves, issues, or revokes credentials.
+                Certificates are generated directly by the portal from verified exam scores and evaluated answer sheet uploads.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsUploadDocModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isAdmin ? 'Issue Official Certificate' : 'Submit Draft Certificate'}</span>
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleOpenUnifiedModal()}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md"
+              >
+                <Sparkles className="w-4 h-4 text-slate-950" />
+                <span>{isAdmin ? 'Issue Official Certificate' : 'Submit Exam & Draft Certificate'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsUploadDocModalOpen(true)}
+                title="Upload Legacy Scanned Document"
+                className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer border border-slate-700"
+              >
+                <UploadCloud className="w-4 h-4 text-slate-400" />
+                <span className="hidden sm:inline">Legacy Upload</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -1484,12 +1631,11 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
                   <tr>
-                    <th className="py-3 px-4">Cert / Marksheet No.</th>
+                    <th className="py-3 px-4">Cert / Reg No.</th>
                     <th className="py-3 px-4">Student & Roll No.</th>
                     <th className="py-3 px-4">Course</th>
-                    <th className="py-3 px-4">Issue Date</th>
-                    <th className="py-3 px-4">Score / Grade</th>
-                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Exam Marks & Standing</th>
+                    <th className="py-3 px-4">Evaluated Answer Sheet</th>
                     <th className="py-3 px-4">Approval</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -1499,23 +1645,49 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                     <tr key={doc.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-sky-400">
                         {doc.certificateNumber}
-                        <span className="block text-[10px] uppercase font-semibold text-slate-400">
-                          {doc.documentType}
-                        </span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-300 border border-sky-500/20">
+                            {doc.isPortalGenerated ? 'PORTAL CERTIFICATE' : doc.documentType}
+                          </span>
+                          {doc.status === 'revoked' && (
+                            <span className="text-[9px] uppercase font-bold px-1 py-0.2 rounded bg-rose-500/20 text-rose-300">
+                              REVOKED
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-white">{doc.studentFullName}</div>
                         <div className="text-[11px] font-mono text-slate-400">{doc.studentIdCode}</div>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-300">{doc.courseName}</td>
-                      <td className="py-3.5 px-4 font-mono text-slate-400">{doc.issueDate}</td>
-                      <td className="py-3.5 px-4 font-medium text-emerald-400">{doc.marksOrGrade || '-'}</td>
                       <td className="py-3.5 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          doc.status === 'valid' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
-                        }`}>
-                          {doc.status.toUpperCase()}
-                        </span>
+                        <span className="text-slate-300 font-medium">{doc.courseName}</span>
+                        <span className="block text-[11px] text-slate-400 font-mono">Issued: {doc.issueDate}</span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-emerald-400 block">{doc.marksOrGrade || 'Cleared'}</span>
+                        {doc.marksObtained !== undefined && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {doc.marksObtained} / {doc.maxScore || 100} ({doc.percentage}%)
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {doc.examAnswerSheetFileName ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAnswerSheet(doc)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
+                            title={`View evaluated paper: ${doc.examAnswerSheetFileName}`}
+                          >
+                            <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate max-w-[120px]">{doc.examAnswerSheetFileName}</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            {doc.isPortalGenerated ? 'Assessment Graded' : 'Direct Upload'}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
@@ -1529,31 +1701,55 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
                           <button
                             type="button"
                             onClick={() => handlePreviewDoc(doc)}
-                            title="Preview Credential"
+                            title="Preview Official Certificate"
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
+
+                          {doc.approvalStatus === 'approved' && doc.status === 'valid' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadPdf(doc)}
+                                title="Download Official Print-Ready PDF Certificate"
+                                className="px-2 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 font-bold text-[11px] border border-sky-500/30 cursor-pointer flex items-center gap-1"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">PDF</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePrintDoc(doc)}
+                                title="Print Official Certificate (A4 Landscape)"
+                                className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 cursor-pointer flex items-center gap-1"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">Print</span>
+                              </button>
+                            </>
+                          )}
 
                           {isAdmin && doc.approvalStatus === 'pending' && (
                             <>
                               <button
                                 type="button"
                                 onClick={() => handleApproveDoc(doc)}
-                                title="Approve"
-                                className="px-2 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] cursor-pointer"
+                                title="Approve and Issue Official Certificate & Publish Marks"
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] cursor-pointer flex items-center gap-1 shadow-sm"
                               >
-                                Approve
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Approve & Issue</span>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleRejectDoc(doc)}
                                 title="Reject"
-                                className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-[11px] border border-rose-500/30 cursor-pointer"
+                                className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-[11px] border border-rose-500/30 cursor-pointer"
                               >
                                 Reject
                               </button>
@@ -1565,7 +1761,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                               type="button"
                               onClick={() => handleOpenRevoke(doc)}
                               title="Revoke Credential"
-                              className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[11px] font-semibold border border-rose-500/30 cursor-pointer"
+                              className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[11px] font-semibold border border-rose-500/30 cursor-pointer"
                             >
                               Revoke
                             </button>
@@ -1576,7 +1772,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                               type="button"
                               onClick={() => handleRestoreDoc(doc)}
                               title="Restore Credential"
-                              className="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30 cursor-pointer"
+                              className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30 cursor-pointer"
                             >
                               Restore
                             </button>
@@ -2376,40 +2572,413 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
 
       {/* Modal 8: Credential Preview Modal */}
       {previewDoc && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-5 sm:p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
               <div>
-                <h3 className="text-base font-bold text-white">{previewDoc.certificateNumber}</h3>
-                <p className="text-xs text-slate-400">{previewDoc.studentFullName} &bull; {previewDoc.courseName}</p>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-sky-400 text-sm sm:text-base">{previewDoc.certificateNumber}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold uppercase">
+                    {previewDoc.isPortalGenerated ? 'Portal Generated Certificate' : previewDoc.documentType}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{previewDoc.studentFullName} &bull; {previewDoc.courseName}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewDoc(null)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-400 hover:text-white cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-slate-950 rounded-2xl p-2 border border-slate-800 flex items-center justify-center min-h-[350px]">
+            <div className="bg-slate-950 rounded-2xl p-2 sm:p-4 border border-slate-800 flex items-center justify-center overflow-auto flex-1 min-h-[300px]">
               {previewUrl && (
                 <img
                   src={previewUrl}
                   alt={previewDoc.fileName}
-                  className="max-h-[500px] w-auto rounded-lg shadow-lg"
+                  className="max-h-[500px] w-auto rounded-lg shadow-2xl object-contain border border-slate-800"
                 />
               )}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-800 shrink-0">
+              <div className="text-[11px] text-slate-400">
+                <span>Issue Date: <strong className="text-slate-200">{previewDoc.issueDate}</strong></span>
+                {previewDoc.marksOrGrade && (
+                  <span className="ml-3 text-emerald-400 font-medium">&bull; {previewDoc.marksOrGrade}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {previewDoc.examAnswerSheetFileName && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAnswerSheet(previewDoc)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-xs flex items-center gap-1.5 border border-amber-500/30 cursor-pointer"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                    <span>View Answer Sheet</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPdf(previewDoc)}
+                  className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Official PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintDoc(previewDoc)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Certificate</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 9: Unified Exam Evaluation & Certificate Submission (One-Step Workflow) */}
+      {isUnifiedModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-sky-800/80 rounded-3xl p-5 sm:p-7 max-w-2xl w-full space-y-4 shadow-2xl my-6">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400">
+                    <Sparkles className="w-4 h-4" />
+                  </span>
+                  <h3 className="text-base sm:text-lg font-bold text-white">
+                    Unified Exam Evaluation & Certificate Submission
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Enter student marks and attach their evaluated exam answer sheet in <strong className="text-sky-300">one single submission</strong>. The official certificate is generated directly by the portal.
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setPreviewDoc(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
+                onClick={() => setIsUnifiedModalOpen(false)}
+                className="text-slate-400 hover:text-white cursor-pointer p-1"
               >
-                Close Preview
+                <X className="w-5 h-5" />
               </button>
+            </div>
+
+            <form onSubmit={handleSaveUnifiedSubmission} className="space-y-4 text-xs">
+              {/* Section 1: Student Selection */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-3">
+                <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
+                  1. Enrolled Student Information
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      Select Student <span className="text-rose-400">*</span>
+                    </label>
+                    <select
+                      required
+                      value={unifiedForm.studentId}
+                      onChange={e => handleUnifiedStudentChange(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-sky-400"
+                    >
+                      <option value="">-- Choose Enrolled Student --</option>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.fullName} ({s.studentIdCode}) &bull; {s.enrolledCourse}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Course Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={unifiedForm.courseName}
+                      onChange={e => setUnifiedForm({ ...unifiedForm, courseName: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Examination & Evaluation Marks */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-3">
+                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">
+                  2. Examination Scores & Standing
+                </span>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">
+                    Assessment / Examination Title <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. DCA Comprehensive Final Practical & Theory Examination"
+                    value={unifiedForm.assessmentTitle}
+                    onChange={e => setUnifiedForm({ ...unifiedForm, assessmentTitle: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Exam Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={unifiedForm.examDate}
+                      onChange={e => setUnifiedForm({ ...unifiedForm, examDate: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Max Score</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={1000}
+                      value={unifiedForm.maxScore}
+                      onChange={e => setUnifiedForm({ ...unifiedForm, maxScore: Number(e.target.value) || 100 })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-sky-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      Marks Obtained <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      max={unifiedForm.maxScore}
+                      step={0.5}
+                      value={unifiedForm.marksObtained}
+                      onChange={e => setUnifiedForm({ ...unifiedForm, marksObtained: Number(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-sky-400 text-emerald-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Computed Grade Badge */}
+                {(() => {
+                  const pct = Math.round((unifiedForm.marksObtained / (unifiedForm.maxScore || 100)) * 100 * 10) / 10;
+                  let gradeBadge = 'Grade C (Passing)';
+                  let colorClass = 'text-amber-400 border-amber-500/30 bg-amber-500/10';
+                  if (pct >= 85) {
+                    gradeBadge = 'Distinction (A+)';
+                    colorClass = 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10';
+                  } else if (pct >= 70) {
+                    gradeBadge = 'Grade A (First Class)';
+                    colorClass = 'text-sky-400 border-sky-500/30 bg-sky-500/10';
+                  } else if (pct >= 55) {
+                    gradeBadge = 'Grade B (Second Class)';
+                    colorClass = 'text-teal-400 border-teal-500/30 bg-teal-500/10';
+                  } else if (pct < 40) {
+                    gradeBadge = 'Needs Improvement';
+                    colorClass = 'text-rose-400 border-rose-500/30 bg-rose-500/10';
+                  }
+                  return (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400">Calculated Percentage & Grade Standing:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-white text-sm">{pct}%</span>
+                        <span className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold ${colorClass}`}>
+                          {gradeBadge}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Evaluator Remarks</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Demonstrated exceptional practical mastery in Tally GST reconciliation & Excel reporting"
+                    value={unifiedForm.remarks}
+                    onChange={e => setUnifiedForm({ ...unifiedForm, remarks: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-400"
+                  />
+                </div>
+              </div>
+
+              {/* Section 3: Certificate Details (Portal Auto-Generated) */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-3">
+                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">
+                  3. Official Certificate Details (Generated by Portal)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      Certificate Registration No. <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. QLI-2026-DCA-1044"
+                      value={unifiedForm.certificateNumber}
+                      onChange={e => setUnifiedForm({ ...unifiedForm, certificateNumber: e.target.value.toUpperCase() })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold uppercase focus:outline-none focus:border-sky-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Official Issue Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={unifiedForm.issueDate}
+                      onChange={e => setUnifiedForm({ ...unifiedForm, issueDate: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-400"
+                    />
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-400 bg-sky-950/30 border border-sky-800/30 rounded-xl p-2.5 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                  <span>
+                    The official Certificate of Completion will be generated automatically with Institute seal, gold border, and public verification QR code upon approval.
+                  </span>
+                </div>
+              </div>
+
+              {/* Section 4: Exam Answer Sheet File Upload */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
+                    4. Upload Evaluated Exam Answer Sheet / Marksheet Scan
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">PDF, PNG, JPG</span>
+                </div>
+
+                <div>
+                  <input
+                    type="file"
+                    ref={answerSheetFileInputRef}
+                    accept=".pdf,image/png,image/jpeg,image/webp"
+                    onChange={e => setAnswerSheetFile(e.target.files?.[0] || null)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-300 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-500 file:text-slate-950 hover:file:bg-sky-400 cursor-pointer"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                    Attach the student's evaluated physical answer paper, laboratory marksheet, or scanned exam sheet. Admin will review this attached answer sheet before approving the certificate.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsUnifiedModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-lg"
+                >
+                  <Sparkles className="w-4 h-4 text-slate-950" />
+                  <span>
+                    {isAdmin ? 'Save Marks & Issue Official Certificate' : 'Submit Marks & Draft Certificate for Approval'}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 10: Answer Sheet Viewer Modal */}
+      {viewingAnswerSheetDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-5 sm:p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-base font-bold text-white">
+                    Evaluated Exam Answer Sheet / Marksheet Paper
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Student: <strong className="text-white">{viewingAnswerSheetDoc.studentFullName}</strong> ({viewingAnswerSheetDoc.studentIdCode}) &bull; Course: {viewingAnswerSheetDoc.courseName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingAnswerSheetDoc(null)}
+                className="text-slate-400 hover:text-white cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 flex items-center justify-center overflow-auto flex-1 min-h-[350px]">
+              {viewingAnswerSheetUrl ? (
+                viewingAnswerSheetDoc.examAnswerSheetMimeType?.includes('pdf') || viewingAnswerSheetDoc.examAnswerSheetFileName?.toLowerCase().endsWith('.pdf') ? (
+                  <iframe
+                    src={viewingAnswerSheetUrl}
+                    title="Answer Sheet Document"
+                    className="w-full h-[480px] rounded-lg border border-slate-800"
+                  />
+                ) : (
+                  <img
+                    src={viewingAnswerSheetUrl}
+                    alt={viewingAnswerSheetDoc.examAnswerSheetFileName || 'Answer Sheet'}
+                    className="max-h-[500px] w-auto rounded-lg shadow-lg object-contain"
+                  />
+                )
+              ) : (
+                <div className="text-center py-12 space-y-3">
+                  <Paperclip className="w-10 h-10 text-slate-600 mx-auto" />
+                  <p className="text-sm font-semibold text-white">
+                    {viewingAnswerSheetDoc.examAnswerSheetFileName || 'Answer Sheet Attached'}
+                  </p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Physical answer sheet record was recorded by evaluator <strong className="text-slate-200">{viewingAnswerSheetDoc.createdByName || viewingAnswerSheetDoc.createdBy}</strong> during official grading.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800 shrink-0">
+              <span className="text-slate-400">
+                Attached File: <strong className="text-amber-400">{viewingAnswerSheetDoc.examAnswerSheetFileName || 'Evaluated Paper'}</strong>
+              </span>
+              <div className="flex gap-2">
+                {viewingAnswerSheetUrl && (
+                  <a
+                    href={viewingAnswerSheetUrl}
+                    download={viewingAnswerSheetDoc.examAnswerSheetFileName || 'Exam_Answer_Sheet'}
+                    className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Answer Sheet</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setViewingAnswerSheetDoc(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

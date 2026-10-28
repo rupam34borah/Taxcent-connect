@@ -21,6 +21,7 @@ import {
   PersonType
 } from '../types/academic';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { generateOfficialCertificateSvg } from '../utils/certificateGenerator';
 
 // Local Storage Keys for offline / local-authoritative persistence
 const STORAGE_KEYS = {
@@ -413,6 +414,36 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     createdByName: 'Ananya Dutta',
     createdAt: '2026-09-02T16:00:00Z',
     updatedAt: '2026-09-02T16:00:00Z',
+  },
+  {
+    id: 'doc-006',
+    studentId: 'stu-005',
+    studentIdCode: 'QLI-STU-2026-005',
+    studentFullName: 'Manash Jyoti Nath',
+    documentType: 'certificate',
+    certificateNumber: 'QLI-2026-DTP-1045',
+    courseName: 'Certificate in Desktop Publishing (DTP)',
+    issueDate: '2026-10-25',
+    marksOrGrade: 'Grade A+ (Distinction - 89%) — 89/100 Marks',
+    marksObtained: 89,
+    maxScore: 100,
+    percentage: 89,
+    grade: 'Distinction (A+)',
+    evaluatorRemarks: 'Excellent mastery of Adobe Photoshop, PageMaker and CorelDraw layout design.',
+    fileStoragePath: 'academic-documents/stu-005/QLI-2026-DTP-1045_generated.pdf',
+    fileName: 'Manash_Jyoti_Nath_QLI-2026-DTP-1045_Certificate.pdf',
+    fileMimeType: 'application/pdf',
+    fileSizeBytes: 245000,
+    status: 'valid',
+    approvalStatus: 'pending',
+    createdBy: 'stf-002',
+    createdByName: 'Ananya Dutta',
+    createdAt: '2026-10-25T11:30:00Z',
+    updatedAt: '2026-10-25T11:30:00Z',
+    isPortalGenerated: true,
+    assessmentTitle: 'DTP Comprehensive Final Practical & Theoretical Examination',
+    examAnswerSheetFileName: 'Manash_Nath_DTP_Final_Evaluated_Answer_Sheet.pdf',
+    examAnswerSheetMimeType: 'application/pdf',
   },
 ];
 
@@ -1617,6 +1648,231 @@ export const academicService = {
     return list.filter(d => d.studentId === studentId && d.approvalStatus === 'approved');
   },
 
+  async getNextCertificateNumber(courseName: string): Promise<string> {
+    const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
+    const currentYear = new Date().getFullYear();
+    let courseCode = 'DCA';
+    const cLower = (courseName || '').toLowerCase();
+    if (cLower.includes('adca')) courseCode = 'ADCA';
+    else if (cLower.includes('tally')) courseCode = 'TLY';
+    else if (cLower.includes('pgdca')) courseCode = 'PGDCA';
+    else if (cLower.includes('dtp')) courseCode = 'DTP';
+
+    const prefix = `QLI-${currentYear}-${courseCode}-`;
+    const existingMatches = docs
+      .map(d => d.certificateNumber)
+      .filter(n => typeof n === 'string' && n.startsWith(prefix));
+
+    const count = 1040 + existingMatches.length + 1;
+    return `${prefix}${count}`;
+  },
+
+  async submitUnifiedExamEvaluation(params: {
+    studentId: string;
+    courseName: string;
+    batchId?: string;
+    batchCode?: string;
+    assessmentTitle: string;
+    examDate: string;
+    maxScore: number;
+    marksObtained: number;
+    remarks?: string;
+    certificateNumber?: string;
+    issueDate?: string;
+    answerSheetFile?: File | null;
+    submittedBy: string;
+    isAdmin?: boolean;
+  }): Promise<{ 
+    success: boolean; 
+    document?: AcademicDocument; 
+    assessment?: AssessmentItem; 
+    marksRecord?: StudentMarkRecord; 
+    error?: string 
+  }> {
+    if (!params.studentId) return { success: false, error: 'Student selection is required.' };
+    if (!params.courseName.trim()) return { success: false, error: 'Course name is required.' };
+    if (!params.assessmentTitle.trim()) return { success: false, error: 'Examination / Assessment title is required.' };
+    if (params.maxScore <= 0) return { success: false, error: 'Maximum score must be greater than zero.' };
+    if (params.marksObtained < 0 || params.marksObtained > params.maxScore) {
+      return { success: false, error: `Marks obtained (${params.marksObtained}) must be between 0 and maximum marks (${params.maxScore}).` };
+    }
+
+    const students = await this.getStudentProfiles();
+    const student = students.find(s => s.id === params.studentId);
+    if (!student) return { success: false, error: 'Student record not found in institutional registry.' };
+
+    const percentage = Math.round((params.marksObtained / params.maxScore) * 100 * 10) / 10;
+    let grade = 'Grade C (Passing)';
+    if (percentage >= 85) grade = 'Distinction (A+)';
+    else if (percentage >= 70) grade = 'Grade A (First Class)';
+    else if (percentage >= 55) grade = 'Grade B (Second Class)';
+    else if (percentage >= 40) grade = 'Grade C (Third Class)';
+    else grade = 'Needs Improvement';
+
+    // Format certificate number
+    let certNo = (params.certificateNumber || '').trim().toUpperCase();
+    if (!certNo) {
+      certNo = await this.getNextCertificateNumber(params.courseName);
+    }
+
+    const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
+    if (docs.some(d => d.certificateNumber.trim().toUpperCase() === certNo)) {
+      certNo = `${certNo}-${Date.now().toString().slice(-3)}`;
+    }
+
+    // Process Answer Sheet File (PDF / Image)
+    let answerSheetDataUrl: string | undefined = undefined;
+    let answerSheetFileName: string | undefined = undefined;
+    let answerSheetMimeType: string | undefined = undefined;
+
+    if (params.answerSheetFile) {
+      try {
+        answerSheetDataUrl = await readFileAsDataUrl(params.answerSheetFile);
+        answerSheetFileName = params.answerSheetFile.name;
+        answerSheetMimeType = params.answerSheetFile.type;
+      } catch (err) {
+        console.warn('Failed to parse answer sheet file:', err);
+      }
+    }
+
+    const effectiveApproval: ApprovalStatus = params.isAdmin ? 'approved' : 'pending';
+    const effectiveMarksStatus: ApprovalStatus = params.isAdmin ? 'published' : 'pending';
+
+    // 1. Create Assessment Item
+    const asmId = 'asm-' + Date.now();
+    const newAsm: AssessmentItem = {
+      id: asmId,
+      title: params.assessmentTitle.trim(),
+      courseId: student.enrolledCourseId || 'crs-dca',
+      courseName: params.courseName,
+      batchId: params.batchId || student.batchId,
+      batchCode: params.batchCode || student.batchCode,
+      maxScore: params.maxScore,
+      passingScore: Math.round(params.maxScore * 0.4),
+      assessmentDate: params.examDate || new Date().toISOString().split('T')[0],
+      status: effectiveMarksStatus,
+      createdBy: params.submittedBy,
+      approvedBy: params.isAdmin ? params.submittedBy : undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    const assessments = await this.getAssessments();
+    assessments.unshift(newAsm);
+    saveToStorage(STORAGE_KEYS.ASSESSMENTS, assessments);
+
+    // 2. Create Student Mark Record
+    const mrkId = 'mrk-' + Date.now();
+    const newMrk: StudentMarkRecord = {
+      id: mrkId,
+      assessmentId: asmId,
+      studentId: student.id,
+      studentIdCode: student.studentIdCode,
+      studentName: student.fullName,
+      marksObtained: params.marksObtained,
+      maxScore: params.maxScore,
+      percentage,
+      grade,
+      remarks: params.remarks?.trim(),
+      status: effectiveMarksStatus,
+      enteredBy: params.submittedBy,
+      approvedBy: params.isAdmin ? params.submittedBy : undefined,
+      updatedAt: new Date().toISOString(),
+      certificateNumber: certNo,
+      answerSheetFileName,
+      answerSheetFileData: answerSheetDataUrl,
+    };
+
+    const marks = loadFromStorage<StudentMarkRecord[]>(STORAGE_KEYS.MARKS, INITIAL_MARKS);
+    marks.unshift(newMrk);
+    saveToStorage(STORAGE_KEYS.MARKS, marks);
+
+    // 3. Create Portal Generated Certificate Document
+    const docId = 'doc-' + Date.now();
+    const marksOrGradeStr = `${grade} (${percentage}%) — ${params.marksObtained}/${params.maxScore} Marks`;
+
+    const newDoc: AcademicDocument = {
+      id: docId,
+      studentId: student.id,
+      studentIdCode: student.studentIdCode,
+      studentFullName: student.fullName,
+      documentType: 'certificate',
+      certificateNumber: certNo,
+      courseName: params.courseName.trim(),
+      issueDate: params.issueDate || new Date().toISOString().split('T')[0],
+      marksOrGrade: marksOrGradeStr,
+      marksObtained: params.marksObtained,
+      maxScore: params.maxScore,
+      percentage,
+      grade,
+      evaluatorRemarks: params.remarks?.trim(),
+      batchCode: params.batchCode || student.batchCode,
+      fileStoragePath: `academic-documents/${student.id}/${certNo}_generated.pdf`,
+      fileName: `${student.fullName.replace(/\s+/g, '_')}_${certNo}_Certificate.pdf`,
+      fileMimeType: 'application/pdf',
+      fileSizeBytes: 245000,
+      status: 'valid',
+      approvalStatus: effectiveApproval,
+      approvedBy: effectiveApproval === 'approved' ? params.submittedBy : undefined,
+      approvedAt: effectiveApproval === 'approved' ? new Date().toISOString() : undefined,
+      createdBy: 'stf-' + params.submittedBy.toLowerCase().replace(/\s+/g, '-'),
+      createdByName: params.submittedBy,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isPortalGenerated: true,
+      assessmentId: asmId,
+      assessmentTitle: params.assessmentTitle,
+      examAnswerSheetFileName: answerSheetFileName,
+      examAnswerSheetFileData: answerSheetDataUrl,
+      examAnswerSheetMimeType: answerSheetMimeType,
+    };
+
+    docs.unshift(newDoc);
+    saveToStorage(STORAGE_KEYS.DOCS, docs);
+
+    // Audit logs
+    logAudit({
+      entityType: 'MARKS',
+      entityId: asmId,
+      action: 'CREATE',
+      performedBy: params.submittedBy,
+      performedByName: params.submittedBy,
+      performedByRole: params.isAdmin ? 'admin' : 'staff',
+      details: {
+        studentIdCode: student.studentIdCode,
+        studentFullName: student.fullName,
+        marksObtained: params.marksObtained,
+        maxScore: params.maxScore,
+        grade,
+        certificateNumber: certNo,
+        hasAnswerSheet: !!answerSheetDataUrl,
+      },
+    });
+
+    logAudit({
+      entityType: 'DOCUMENT',
+      entityId: docId,
+      action: 'CREATE',
+      performedBy: params.submittedBy,
+      performedByName: params.submittedBy,
+      performedByRole: params.isAdmin ? 'admin' : 'staff',
+      details: {
+        certificateNumber: certNo,
+        studentFullName: student.fullName,
+        courseName: params.courseName,
+        approvalStatus: effectiveApproval,
+        isPortalGenerated: true,
+        hasAnswerSheet: !!answerSheetDataUrl,
+      },
+    });
+
+    return {
+      success: true,
+      document: newDoc,
+      assessment: newAsm,
+      marksRecord: newMrk,
+    };
+  },
+
   async uploadAcademicDocument(params: {
     studentId: string;
     documentType: AcademicDocumentType;
@@ -1709,6 +1965,30 @@ export const academicService = {
     doc.updatedAt = new Date().toISOString();
     doc.updatedBy = adminName;
     saveToStorage(STORAGE_KEYS.DOCS, docs);
+
+    // Synchronize linked assessment and marks
+    if (doc.assessmentId) {
+      const assessments = await this.getAssessments();
+      const asm = assessments.find(a => a.id === doc.assessmentId);
+      if (asm) {
+        asm.status = 'published';
+        asm.approvedBy = adminName;
+        saveToStorage(STORAGE_KEYS.ASSESSMENTS, assessments);
+      }
+    }
+
+    const marks = loadFromStorage<StudentMarkRecord[]>(STORAGE_KEYS.MARKS, INITIAL_MARKS);
+    let marksChanged = false;
+    marks.forEach(m => {
+      if ((doc.assessmentId && m.assessmentId === doc.assessmentId) || m.certificateNumber === doc.certificateNumber) {
+        m.status = 'published';
+        m.approvedBy = adminName;
+        marksChanged = true;
+      }
+    });
+    if (marksChanged) {
+      saveToStorage(STORAGE_KEYS.MARKS, marks);
+    }
 
     logAudit({
       entityType: 'DOCUMENT',
@@ -1806,10 +2086,19 @@ export const academicService = {
   },
 
   async getSecureDocumentUrl(doc: AcademicDocument): Promise<string> {
-    if (doc.localFileData) return doc.localFileData;
-    const previewSvg = generateCertifiedDocumentPreviewSvg(doc);
-    const blob = new Blob([previewSvg], { type: 'image/svg+xml' });
-    return URL.createObjectURL(blob);
+    if (doc.isPortalGenerated || doc.documentType === 'certificate' || !doc.localFileData) {
+      const previewSvg = generateOfficialCertificateSvg(doc);
+      const blob = new Blob([previewSvg], { type: 'image/svg+xml' });
+      return URL.createObjectURL(blob);
+    }
+    return doc.localFileData;
+  },
+
+  async getSecureAnswerSheetUrl(doc: AcademicDocument): Promise<string | null> {
+    if (doc.examAnswerSheetFileData) {
+      return doc.examAnswerSheetFileData;
+    }
+    return null;
   },
 
   // ------------------------------------------------------------------
