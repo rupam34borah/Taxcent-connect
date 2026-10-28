@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, DEMO_ACCOUNTS, DemoAccount } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { Language } from '../types';
 import { 
   GraduationCap, 
@@ -11,11 +11,8 @@ import {
   X, 
   CheckCircle2, 
   AlertCircle, 
-  ArrowRight, 
-  Sparkles, 
   ShieldAlert,
   Building2,
-  ExternalLink
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -27,11 +24,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
     isAuthModalOpen, 
     closeAuthModal, 
     authModalInitialRole, 
-    login, 
-    loginAsDemo,
-    user,
-    isAuthenticated,
-    logout
+    login,
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'student' | 'staff' | 'admin'>('student');
@@ -39,7 +32,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const showDemoLogins = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.search.includes('demo=true'));
 
   useEffect(() => {
     if (isAuthModalOpen) {
@@ -57,7 +49,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
     if (!identifier.trim()) {
       setError(
         activeTab === 'student'
-          ? 'Please enter your Student Registration ID (e.g. QLI-STU-2026-001) or Email.'
+          ? 'Please enter your registered student email address.'
           : 'Please enter your institutional email.'
       );
       return;
@@ -77,8 +69,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
       setLoading(false);
     }
   };
-
-  const relevantDemoAccounts = DEMO_ACCOUNTS.filter(a => a.role === activeTab);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fade-in overflow-y-auto">
@@ -212,15 +202,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
                   {activeTab === 'student' ? <GraduationCap className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
                 </div>
                 <input
-                  type="text"
+                  type="email"
+                  autoComplete="username"
                   value={identifier}
                   onChange={e => setIdentifier(e.target.value)}
                   placeholder={
                     activeTab === 'student'
-                      ? 'e.g. QLI-STU-2026-001 or rahul.sharma@example.com'
-                      : activeTab === 'staff'
-                      ? 'e.g. staff@taxcent.in'
-                      : 'e.g. admin@taxcent.in'
+                      ? 'Registered student email'
+                      : 'Institutional email'
                   }
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-hidden font-mono"
                 />
@@ -237,6 +226,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
                 </div>
                 <input
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -265,59 +255,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
             </button>
           </form>
 
-          {/* Quick 1-Click Demo Accounts (Only visible in Development or when ?demo=true is in URL) */}
-          {showDemoLogins ? (
-            <div className="pt-3 border-t border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-amber-400" />
-                  Dev / Testing Credentials:
-                </span>
-                <span className="text-[10px] text-slate-500 font-mono">Hidden in public release</span>
-              </div>
-
-              <div className="space-y-1.5">
-                {relevantDemoAccounts.map(account => (
-                  <button
-                    key={account.identifier}
-                    type="button"
-                    onClick={() => loginAsDemo(account)}
-                    className="w-full p-2.5 rounded-xl bg-slate-950/70 hover:bg-slate-800 border border-slate-700/70 hover:border-sky-500/60 transition-all text-left flex items-center justify-between group cursor-pointer"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white group-hover:text-sky-300 transition-colors truncate">
-                          {account.name}
-                        </span>
-                        {account.studentIdCode && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-950 text-sky-300 border border-sky-800">
-                            {account.studentIdCode}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-slate-400 block truncate">
-                        {account.description}
-                      </span>
-                    </div>
-                    <div className="w-6 h-6 rounded-lg bg-sky-500/10 group-hover:bg-sky-500 text-sky-400 group-hover:text-slate-950 flex items-center justify-center shrink-0 transition-colors">
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 text-center space-y-1">
-              <p>
-                {activeTab === 'student'
-                  ? 'Students: Use the student registration ID found on your official fee receipt or certificate.'
-                  : 'Staff & Admin: Access is strictly restricted to authorized institutional accounts.'}
-              </p>
-              <p className="text-slate-500 text-[10px]">
-                Assistance needed? Contact the Academic Office at Ranabari or call 8876824424.
-              </p>
-            </div>
-          )}
+          <div className="pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 text-center space-y-1">
+            <p>
+              {activeTab === 'student'
+                ? 'Students: Sign in with the email address linked to your student profile.'
+                : 'Staff & Admin: Sign in with your authorized institutional account.'}
+            </p>
+            <p className="text-slate-500 text-[10px]">
+              Access is verified against the institute account registry. Contact the Academic Office if you need help.
+            </p>
+          </div>
 
           {/* Public Users Notice */}
           <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between flex-wrap gap-2">

@@ -282,6 +282,71 @@ CREATE TABLE IF NOT EXISTS public.academic_audit_logs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 13a. Bring forward the legacy certificate schema before indexes and RLS
+-- reference columns introduced by this migration. CREATE TABLE IF NOT EXISTS
+-- does not add columns to tables created by 20261027.
+ALTER TABLE public.institute_staff
+    ADD COLUMN IF NOT EXISTS staff_id_code VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS phone VARCHAR(25),
+    ADD COLUMN IF NOT EXISTS designation VARCHAR(150) NOT NULL DEFAULT 'Instructor',
+    ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '["attendance", "student_records", "marks_entry", "certificate_draft"]'::jsonb,
+    ADD COLUMN IF NOT EXISTS assigned_courses JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS assigned_batches JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS invitation_status VARCHAR(50) NOT NULL DEFAULT 'active',
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+UPDATE public.institute_staff
+SET staff_id_code = 'QLI-STF-' || UPPER(SUBSTRING(REPLACE(id::text, '-', ''), 1, 8))
+WHERE staff_id_code IS NULL OR BTRIM(staff_id_code) = '';
+
+ALTER TABLE public.institute_staff
+    ALTER COLUMN staff_id_code SET NOT NULL;
+
+ALTER TABLE public.student_profiles
+    ADD COLUMN IF NOT EXISTS enrolled_course_id UUID REFERENCES public.courses(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS enrolled_course_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES public.batches(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS batch_code VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS enrolment_status VARCHAR(50) NOT NULL DEFAULT 'active',
+    ADD COLUMN IF NOT EXISTS is_portal_active BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS invitation_sent_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES public.institute_staff(id) ON DELETE SET NULL;
+
+DO $backfill_legacy_course_name$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'student_profiles'
+          AND column_name = 'enrolled_course'
+    ) THEN
+        EXECUTE $sql$
+            UPDATE public.student_profiles
+            SET enrolled_course_name = COALESCE(
+                NULLIF(BTRIM(enrolled_course_name), ''),
+                NULLIF(BTRIM(enrolled_course), ''),
+                'Unassigned'
+            )
+            WHERE enrolled_course_name IS NULL OR BTRIM(enrolled_course_name) = ''
+        $sql$;
+    ELSE
+        UPDATE public.student_profiles
+        SET enrolled_course_name = 'Unassigned'
+        WHERE enrolled_course_name IS NULL OR BTRIM(enrolled_course_name) = '';
+    END IF;
+END
+$backfill_legacy_course_name$;
+
+ALTER TABLE public.student_profiles
+    ALTER COLUMN enrolled_course_name SET NOT NULL;
+
+ALTER TABLE public.academic_documents
+    ADD COLUMN IF NOT EXISTS approval_status approval_status_type NOT NULL DEFAULT 'approved',
+    ADD COLUMN IF NOT EXISTS approved_by_staff_id UUID REFERENCES public.institute_staff(id),
+    ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS rejection_reason TEXT,
+    ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255);
+
 -- 14. Indexes for Extreme Scalability & Query Performance
 CREATE INDEX IF NOT EXISTS idx_student_profiles_code ON public.student_profiles(student_id_code);
 CREATE INDEX IF NOT EXISTS idx_student_profiles_email ON public.student_profiles(email);

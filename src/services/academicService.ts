@@ -178,7 +178,7 @@ const INITIAL_BATCHES: BatchItem[] = [
   },
 ];
 
-const INITIAL_STAFF: StaffMember[] = [
+const INITIAL_STAFF: StaffMember[] = import.meta.env.DEV ? [
   {
     id: 'stf-001',
     staffIdCode: 'QLI-STF-2025-001',
@@ -224,9 +224,9 @@ const INITIAL_STAFF: StaffMember[] = [
     invitationStatus: 'active',
     createdAt: '2026-02-15T11:30:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_STUDENTS: StudentProfile[] = [
+const INITIAL_STUDENTS: StudentProfile[] = import.meta.env.DEV ? [
   {
     id: 'stu-001',
     studentIdCode: 'QLI-STU-2026-001',
@@ -300,9 +300,9 @@ const INITIAL_STUDENTS: StudentProfile[] = [
     isPortalActive: true,
     invitationStatus: 'active',
   },
-];
+ ] : [];
 
-const INITIAL_DOCUMENTS: AcademicDocument[] = [
+const INITIAL_DOCUMENTS: AcademicDocument[] = import.meta.env.DEV ? [
   {
     id: 'doc-001',
     studentId: 'stu-001',
@@ -476,9 +476,9 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     examAnswerSheetFileName: 'Manash_Nath_DTP_Final_Evaluated_Answer_Sheet.pdf',
     examAnswerSheetMimeType: 'application/pdf',
   },
-];
+ ] : [];
 
-const INITIAL_ATTENDANCE: AttendanceRecord[] = [
+const INITIAL_ATTENDANCE: AttendanceRecord[] = import.meta.env.DEV ? [
   {
     id: 'att-001',
     personType: 'student',
@@ -551,9 +551,9 @@ const INITIAL_ATTENDANCE: AttendanceRecord[] = [
     markedBy: 'Biometric System / Admin Punch',
     markedAt: new Date().toISOString(),
   },
-];
+ ] : [];
 
-const INITIAL_ASSESSMENTS: AssessmentItem[] = [
+const INITIAL_ASSESSMENTS: AssessmentItem[] = import.meta.env.DEV ? [
   {
     id: 'asm-001',
     title: 'DCA Mid-Term Practical & Theory Examination',
@@ -584,9 +584,9 @@ const INITIAL_ASSESSMENTS: AssessmentItem[] = [
     approvedBy: 'Prof. Debajit Saikia (Admin)',
     createdAt: '2026-05-15T11:00:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_MARKS: StudentMarkRecord[] = [
+const INITIAL_MARKS: StudentMarkRecord[] = import.meta.env.DEV ? [
   {
     id: 'mrk-001',
     assessmentId: 'asm-001',
@@ -619,9 +619,9 @@ const INITIAL_MARKS: StudentMarkRecord[] = [
     approvedBy: 'Prof. Debajit Saikia (Admin)',
     updatedAt: '2026-05-18T14:00:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_LEARNING_MATERIALS: LearningResourceItem[] = [
+const INITIAL_LEARNING_MATERIALS: LearningResourceItem[] = import.meta.env.DEV ? [
   {
     id: 'mat-001',
     title: 'DCA Complete Official Curriculum & Examination Blueprint 2026',
@@ -679,9 +679,9 @@ const INITIAL_LEARNING_MATERIALS: LearningResourceItem[] = [
     uploadedBy: 'Ananya Dutta',
     uploadedAt: '2026-03-05T14:10:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_MOCK_TESTS: MockTestItem[] = [
+const INITIAL_MOCK_TESTS: MockTestItem[] = import.meta.env.DEV ? [
   {
     id: 'test-dca-01',
     title: 'DCA Computer Fundamentals & MS Office Mastery Test',
@@ -800,7 +800,7 @@ const INITIAL_MOCK_TESTS: MockTestItem[] = [
       },
     ],
   },
-];
+ ] : [];
 
 const INITIAL_GOVT_PAPERS: GovtExamPaperItem[] = [
   {
@@ -866,8 +866,15 @@ export function maskStudentName(fullName: string): string {
     .join(' ');
 }
 
-// Helpers for localStorage retrieval with fallback
+// Browser storage is only a development preview. It is never an authority for
+// authentication, academic records, grades, or certificate verification.
+const LOCAL_PREVIEW_ENABLED = import.meta.env.DEV && !isSupabaseConfigured;
+
 function loadFromStorage<T>(key: string, defaultData: T): T {
+  if (!LOCAL_PREVIEW_ENABLED) {
+    return (Array.isArray(defaultData) ? [] : defaultData) as T;
+  }
+
   try {
     const raw = localStorage.getItem(key);
     if (!raw) {
@@ -881,6 +888,10 @@ function loadFromStorage<T>(key: string, defaultData: T): T {
 }
 
 function saveToStorage<T>(key: string, data: T): void {
+  if (!LOCAL_PREVIEW_ENABLED) {
+    throw new Error('Local academic storage is disabled outside the development preview.');
+  }
+
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (err) {
@@ -2192,6 +2203,19 @@ export const academicService = {
   // 9. MOCK TESTS & GOVERNMENT EXAM PREPARATION
   // ------------------------------------------------------------------
   async getMockTests(category?: ExamCategory): Promise<MockTestItem[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.rpc('get_published_mock_tests', {
+        p_category: category || null,
+      });
+      if (error) {
+        console.error('Could not load published mock tests:', error);
+        return [];
+      }
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      return Array.isArray(result) ? result as MockTestItem[] : [];
+    }
+
+    if (!LOCAL_PREVIEW_ENABLED) return [];
     const list = loadFromStorage<MockTestItem[]>(STORAGE_KEYS.MOCK_TESTS, INITIAL_MOCK_TESTS);
     if (!category) return list;
     return list.filter(t => t.category === category);
@@ -2224,8 +2248,26 @@ export const academicService = {
     startedAt: string;
     userAnswers: Record<string, number>;
   }): Promise<{ attempt: MockTestAttempt; test: MockTestItem }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.rpc('submit_mock_test_attempt', {
+        p_test_id: params.testId,
+        p_answers: params.userAnswers,
+      });
+      if (error) throw new Error(`Mock test submission failed: ${error.message}`);
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      if (!result?.attempt || !result?.test) {
+        throw new Error('The server returned an invalid mock test result.');
+      }
+      return result as { attempt: MockTestAttempt; test: MockTestItem };
+    }
+
+    if (!LOCAL_PREVIEW_ENABLED) {
+      throw new Error('Mock test submissions require secure Supabase authentication.');
+    }
+
     const tests = await this.getMockTests();
-    const test = tests.find(t => t.id === params.testId) || INITIAL_MOCK_TESTS[0];
+    const test = tests.find(t => t.id === params.testId);
+    if (!test) throw new Error('Mock test not found.');
 
     // Compute authoritatively on server/service logic (answers were concealed from student)
     let score = 0;
@@ -2262,6 +2304,37 @@ export const academicService = {
   },
 
   async getStudentAttempts(studentId: string): Promise<MockTestAttempt[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('mock_test_attempts')
+        .select('id, test_id, student_id, started_at, completed_at, user_answers, score_obtained, total_marks, percentage, passed, mock_tests(title), student_profiles(full_name)')
+        .eq('student_id', studentId)
+        .order('completed_at', { ascending: false });
+      if (error) {
+        console.error('Could not load mock test attempts:', error);
+        return [];
+      }
+      return (data || []).map((row: any) => {
+        const test = Array.isArray(row.mock_tests) ? row.mock_tests[0] : row.mock_tests;
+        const student = Array.isArray(row.student_profiles) ? row.student_profiles[0] : row.student_profiles;
+        return {
+          id: row.id,
+          testId: row.test_id,
+          testTitle: test?.title || 'Mock Test',
+          studentId: row.student_id,
+          studentName: student?.full_name || '',
+          startedAt: row.started_at,
+          completedAt: row.completed_at,
+          userAnswers: row.user_answers || {},
+          scoreObtained: Number(row.score_obtained),
+          totalMarks: Number(row.total_marks),
+          percentage: Number(row.percentage),
+          passed: Boolean(row.passed),
+        };
+      });
+    }
+
+    if (!LOCAL_PREVIEW_ENABLED) return [];
     const attempts = loadFromStorage<MockTestAttempt[]>(STORAGE_KEYS.MOCK_ATTEMPTS, []);
     return attempts.filter(a => a.studentId === studentId);
   },

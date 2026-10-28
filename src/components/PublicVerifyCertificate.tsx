@@ -34,7 +34,7 @@ export const PublicVerifyCertificate: React.FC<PublicVerifyCertificateProps> = (
   const [result, setResult] = useState<PublicVerificationResponse | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
-  const showDemoPills = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.search.includes('demo=true'));
+  const showDemoPills = import.meta.env.DEV;
 
   const handleVerify = async (queryToSearch?: string) => {
     const q = (queryToSearch ?? certQuery).trim();
