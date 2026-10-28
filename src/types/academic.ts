@@ -140,6 +140,7 @@ export interface AcademicDocument {
   studentId: string;
   documentType: AcademicDocumentType;
   certificateNumber: string;
+  marksheetNumber?: string;
   studentIdCode: string;
   studentFullName: string;
   courseName: string;

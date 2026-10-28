@@ -21,7 +21,11 @@ import {
   PersonType
 } from '../types/academic';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { generateOfficialCertificateSvg } from '../utils/certificateGenerator';
+import { 
+  generateOfficialCertificateSvg, 
+  generateOfficialMarksheetSvg, 
+  computeGradeFrom100 
+} from '../utils/certificateGenerator';
 
 // Local Storage Keys for offline / local-authoritative persistence
 const STORAGE_KEYS = {
@@ -306,9 +310,14 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     studentFullName: 'Rahul Sharma',
     documentType: 'certificate',
     certificateNumber: 'QLI-2026-DCA-1042',
+    marksheetNumber: 'QLI-2026-DCA-1042-M',
     courseName: 'Diploma in Computer Application (DCA)',
     issueDate: '2026-08-15',
-    marksOrGrade: 'Grade A+ (92.5%)',
+    marksOrGrade: 'Grade A+ (Distinction - 92.5%) — 92.5/100 Marks',
+    marksObtained: 92.5,
+    maxScore: 100,
+    percentage: 92.5,
+    grade: 'A+',
     fileStoragePath: 'academic-documents/stu-001/QLI-2026-DCA-1042.pdf',
     fileName: 'Rahul_Sharma_DCA_Certificate.pdf',
     fileMimeType: 'application/pdf',
@@ -321,6 +330,8 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     createdByName: 'Ananya Dutta',
     createdAt: '2026-08-15T10:00:00Z',
     updatedAt: '2026-08-15T10:00:00Z',
+    isPortalGenerated: true,
+    batchCode: 'DCA-2026-M1',
   },
   {
     id: 'doc-002',
@@ -328,16 +339,30 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     studentIdCode: 'QLI-STU-2026-001',
     studentFullName: 'Rahul Sharma',
     documentType: 'marksheet',
-    certificateNumber: 'QLI-2026-DCA-1042-M',
+    certificateNumber: 'QLI-2026-DCA-1042',
+    marksheetNumber: 'QLI-2026-DCA-1042-M',
     courseName: 'Diploma in Computer Application (DCA)',
     issueDate: '2026-08-15',
-    marksOrGrade: 'Total Marks: 462 / 500 (92.4%)',
+    marksOrGrade: 'Total Marks: 92.5 / 100 (92.5%) — Grade A+',
+    marksObtained: 92.5,
+    maxScore: 100,
+    percentage: 92.5,
+    grade: 'A+',
     fileStoragePath: 'academic-documents/stu-001/QLI-2026-DCA-1042-M.pdf',
     fileName: 'Rahul_Sharma_DCA_Marksheet.pdf',
     fileMimeType: 'application/pdf',
     fileSizeBytes: 198400,
     status: 'valid',
     approvalStatus: 'approved',
+    approvedBy: 'Prof. Debajit Saikia (Admin)',
+    approvedAt: '2026-08-15T10:20:00Z',
+    createdBy: 'stf-002',
+    createdByName: 'Ananya Dutta',
+    createdAt: '2026-08-15T10:15:00Z',
+    updatedAt: '2026-08-15T10:15:00Z',
+    isPortalGenerated: true,
+    batchCode: 'DCA-2026-M1',
+  },
     approvedBy: 'Prof. Debajit Saikia (Admin)',
     approvedAt: '2026-08-15T10:20:00Z',
     createdBy: 'stf-002',
@@ -376,9 +401,14 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     studentFullName: 'Rupam Borah',
     documentType: 'certificate',
     certificateNumber: 'QLI-2026-TLY-2031',
+    marksheetNumber: 'QLI-2026-TLY-2031-M',
     courseName: 'Professional Tally Prime & GST Certification',
     issueDate: '2026-06-10',
-    marksOrGrade: 'Grade Distinction (96%)',
+    marksOrGrade: 'Grade A+ (Distinction - 96%) — 96/100 Marks',
+    marksObtained: 96,
+    maxScore: 100,
+    percentage: 96,
+    grade: 'A+',
     fileStoragePath: 'academic-documents/stu-004/QLI-2026-TLY-2031.pdf',
     fileName: 'Rupam_Borah_Tally_GST_Certificate.pdf',
     fileMimeType: 'application/pdf',
@@ -391,6 +421,7 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     createdByName: 'Biplab Hazarika',
     createdAt: '2026-06-10T14:20:00Z',
     updatedAt: '2026-06-10T14:20:00Z',
+    isPortalGenerated: true,
   },
   {
     id: 'doc-005',
@@ -399,9 +430,14 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     studentFullName: 'Pranjal Saikia',
     documentType: 'certificate',
     certificateNumber: 'QLI-2026-PGDCA-3091',
+    marksheetNumber: 'QLI-2026-PGDCA-3091-M',
     courseName: 'Post Graduate Diploma in Computer Applications (PGDCA)',
     issueDate: '2026-09-02',
-    marksOrGrade: 'Grade A (88%)',
+    marksOrGrade: 'Grade A (First Class - 88%) — 88/100 Marks',
+    marksObtained: 88,
+    maxScore: 100,
+    percentage: 88,
+    grade: 'A',
     fileStoragePath: 'academic-documents/stu-003/QLI-2026-PGDCA-3091.pdf',
     fileName: 'Pranjal_Saikia_PGDCA_Certificate.pdf',
     fileMimeType: 'application/pdf',
@@ -414,6 +450,7 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     createdByName: 'Ananya Dutta',
     createdAt: '2026-09-02T16:00:00Z',
     updatedAt: '2026-09-02T16:00:00Z',
+    isPortalGenerated: true,
   },
   {
     id: 'doc-006',
@@ -422,6 +459,7 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     studentFullName: 'Manash Jyoti Nath',
     documentType: 'certificate',
     certificateNumber: 'QLI-2026-DTP-1045',
+    marksheetNumber: 'QLI-2026-DTP-1045-M',
     courseName: 'Certificate in Desktop Publishing (DTP)',
     issueDate: '2026-10-25',
     marksOrGrade: 'Grade A+ (Distinction - 89%) — 89/100 Marks',
@@ -1701,15 +1739,14 @@ export const academicService = {
     const student = students.find(s => s.id === params.studentId);
     if (!student) return { success: false, error: 'Student record not found in institutional registry.' };
 
-    const percentage = Math.round((params.marksObtained / params.maxScore) * 100 * 10) / 10;
-    let grade = 'Grade C (Passing)';
-    if (percentage >= 85) grade = 'Distinction (A+)';
-    else if (percentage >= 70) grade = 'Grade A (First Class)';
-    else if (percentage >= 55) grade = 'Grade B (Second Class)';
-    else if (percentage >= 40) grade = 'Grade C (Third Class)';
-    else grade = 'Needs Improvement';
+    // Enforce 100 Total Marks
+    const maxScore = 100;
+    const rawMarks = Math.max(0, Math.min(100, Number(params.marksObtained)));
+    const percentage = Math.round(rawMarks * 10) / 10;
+    const gradeInfo = computeGradeFrom100(rawMarks);
+    const grade = gradeInfo.badge;
 
-    // Format certificate number
+    // Portal auto-generates certificate number without staff input
     let certNo = (params.certificateNumber || '').trim().toUpperCase();
     if (!certNo) {
       certNo = await this.getNextCertificateNumber(params.courseName);
@@ -1719,8 +1756,9 @@ export const academicService = {
     if (docs.some(d => d.certificateNumber.trim().toUpperCase() === certNo)) {
       certNo = `${certNo}-${Date.now().toString().slice(-3)}`;
     }
+    const marksheetNo = `${certNo}-M`;
 
-    // Process Answer Sheet File (PDF / Image)
+    // Process Answer Sheet File (PDF / Image) - Accessible ONLY to Staff and Admin
     let answerSheetDataUrl: string | undefined = undefined;
     let answerSheetFileName: string | undefined = undefined;
     let answerSheetMimeType: string | undefined = undefined;
@@ -1747,8 +1785,8 @@ export const academicService = {
       courseName: params.courseName,
       batchId: params.batchId || student.batchId,
       batchCode: params.batchCode || student.batchCode,
-      maxScore: params.maxScore,
-      passingScore: Math.round(params.maxScore * 0.4),
+      maxScore: 100,
+      passingScore: 40,
       assessmentDate: params.examDate || new Date().toISOString().split('T')[0],
       status: effectiveMarksStatus,
       createdBy: params.submittedBy,
@@ -1768,8 +1806,8 @@ export const academicService = {
       studentId: student.id,
       studentIdCode: student.studentIdCode,
       studentName: student.fullName,
-      marksObtained: params.marksObtained,
-      maxScore: params.maxScore,
+      marksObtained: rawMarks,
+      maxScore: 100,
       percentage,
       grade,
       remarks: params.remarks?.trim(),
@@ -1788,7 +1826,7 @@ export const academicService = {
 
     // 3. Create Portal Generated Certificate Document
     const docId = 'doc-' + Date.now();
-    const marksOrGradeStr = `${grade} (${percentage}%) — ${params.marksObtained}/${params.maxScore} Marks`;
+    const marksOrGradeStr = `${gradeInfo.badge} (${percentage}%) — ${rawMarks}/100 Marks`;
 
     const newDoc: AcademicDocument = {
       id: docId,
@@ -1797,13 +1835,14 @@ export const academicService = {
       studentFullName: student.fullName,
       documentType: 'certificate',
       certificateNumber: certNo,
+      marksheetNumber: marksheetNo,
       courseName: params.courseName.trim(),
       issueDate: params.issueDate || new Date().toISOString().split('T')[0],
       marksOrGrade: marksOrGradeStr,
-      marksObtained: params.marksObtained,
-      maxScore: params.maxScore,
+      marksObtained: rawMarks,
+      maxScore: 100,
       percentage,
-      grade,
+      grade: gradeInfo.grade,
       evaluatorRemarks: params.remarks?.trim(),
       batchCode: params.batchCode || student.batchCode,
       fileStoragePath: `academic-documents/${student.id}/${certNo}_generated.pdf`,
@@ -1826,7 +1865,20 @@ export const academicService = {
       examAnswerSheetMimeType: answerSheetMimeType,
     };
 
+    // 4. Create Paired Marksheet Document with identical details & -M suffix
+    const marksheetDocId = 'doc-m-' + Date.now();
+    const marksheetDoc: AcademicDocument = {
+      ...newDoc,
+      id: marksheetDocId,
+      documentType: 'marksheet',
+      certificateNumber: certNo,
+      marksheetNumber: marksheetNo,
+      fileStoragePath: `academic-documents/${student.id}/${marksheetNo}_generated.pdf`,
+      fileName: `${student.fullName.replace(/\s+/g, '_')}_${marksheetNo}_Marksheet.pdf`,
+    };
+
     docs.unshift(newDoc);
+    docs.unshift(marksheetDoc);
     saveToStorage(STORAGE_KEYS.DOCS, docs);
 
     // Audit logs
