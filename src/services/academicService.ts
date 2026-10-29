@@ -2553,8 +2553,10 @@ export const academicService = {
       if (error) throw error;
       return data.signedUrl;
     }
-    if (doc.isPortalGenerated || doc.documentType === 'certificate' || !doc.localFileData) {
-      const previewSvg = generateOfficialCertificateSvg(doc);
+    if (doc.isPortalGenerated || !doc.localFileData) {
+      const previewSvg = doc.documentType === 'marksheet'
+        ? generateOfficialMarksheetSvg(doc)
+        : generateOfficialCertificateSvg(doc);
       const blob = new Blob([previewSvg], { type: 'image/svg+xml' });
       return URL.createObjectURL(blob);
     }

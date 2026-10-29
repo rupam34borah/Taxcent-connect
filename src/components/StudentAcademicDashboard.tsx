@@ -42,7 +42,7 @@ import {
   Printer,
   Paperclip
 } from 'lucide-react';
-import { downloadCertificatePdf, printCertificate } from '../utils/certificateGenerator';
+import { downloadAcademicDocumentPdf, printAcademicDocument } from '../utils/certificateGenerator';
 
 interface StudentAcademicDashboardProps {
   lang: Language;
@@ -630,7 +630,7 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => downloadCertificatePdf(cert)}
+                        onClick={() => downloadAcademicDocumentPdf(cert)}
                         title="Download Print-Ready PDF Certificate"
                         className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
@@ -639,7 +639,7 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
                       </button>
                       <button
                         type="button"
-                        onClick={() => printCertificate(cert)}
+                        onClick={() => printAcademicDocument(cert)}
                         title="Print Certificate (A4 Landscape)"
                         className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
@@ -1173,21 +1173,21 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
                 Official Credential Issued by Quantum Learning Institute
               </span>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
+                  <button
                   type="button"
-                  onClick={() => downloadCertificatePdf(previewDoc)}
+                    onClick={() => downloadAcademicDocumentPdf(previewDoc)}
                   className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow-md text-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download Official PDF</span>
+                    <span>{previewDoc.documentType === 'marksheet' ? 'Download Statement of Marks PDF' : 'Download Completion Certificate PDF'}</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => printCertificate(previewDoc)}
+                    onClick={() => printAcademicDocument(previewDoc)}
                   className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow-md text-xs"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Certificate</span>
+                    <span>{previewDoc.documentType === 'marksheet' ? 'Print Statement of Marks' : 'Print Certificate'}</span>
                 </button>
                 <button
                   type="button"

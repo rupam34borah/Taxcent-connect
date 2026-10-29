@@ -20,10 +20,7 @@ import {
 } from '../types/academic';
 import { academicService } from '../services/academicService';
 import { useAuth } from '../context/AuthContext';
-import { 
-  downloadCertificatePdf, 
-  printCertificate 
-} from '../utils/certificateGenerator';
+import { downloadAcademicDocumentPdf, printAcademicDocument } from '../utils/certificateGenerator';
 import { 
   LayoutDashboard,
   Users,
@@ -657,11 +654,11 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
   };
 
   const handleDownloadPdf = (doc: AcademicDocument) => {
-    downloadCertificatePdf(doc);
+    downloadAcademicDocumentPdf(doc);
   };
 
   const handlePrintDoc = (doc: AcademicDocument) => {
-    printCertificate(doc);
+    printAcademicDocument(doc);
   };
 
   // ------------------------------------------------------------------
@@ -1709,7 +1706,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                           <button
                             type="button"
                             onClick={() => handlePreviewDoc(doc)}
-                            title="Preview Official Certificate"
+                            title={`Preview Official ${doc.documentType === 'marksheet' ? 'Statement of Marks' : 'Certificate'}`}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -1720,7 +1717,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                               <button
                                 type="button"
                                 onClick={() => handleDownloadPdf(doc)}
-                                title="Download Official Print-Ready PDF Certificate"
+                                title={`Download ${doc.documentType === 'marksheet' ? 'Statement of Marks' : 'Completion Certificate'} PDF`}
                                 className="px-2 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 font-bold text-[11px] border border-sky-500/30 cursor-pointer flex items-center gap-1"
                               >
                                 <Download className="w-3.5 h-3.5" />
@@ -1729,7 +1726,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                               <button
                                 type="button"
                                 onClick={() => handlePrintDoc(doc)}
-                                title="Print Official Certificate (A4 Landscape)"
+                                title={`Print ${doc.documentType === 'marksheet' ? 'Statement of Marks (A4 Portrait)' : 'Completion Certificate (A4 Landscape)'}`}
                                 className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 cursor-pointer flex items-center gap-1"
                               >
                                 <Printer className="w-3.5 h-3.5" />
@@ -2631,7 +2628,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                   className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download Official PDF</span>
+                  <span>{previewDoc.documentType === 'marksheet' ? 'Download Statement of Marks PDF' : 'Download Completion Certificate PDF'}</span>
                 </button>
                 <button
                   type="button"
@@ -2639,7 +2636,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                   className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Certificate</span>
+                  <span>{previewDoc.documentType === 'marksheet' ? 'Print Statement of Marks' : 'Print Completion Certificate'}</span>
                 </button>
                 <button
                   type="button"
