@@ -266,7 +266,7 @@ export type DocumentAuditLog = AcademicAuditLog;
 
 export interface PublicVerificationResponse {
   found: boolean;
-  status: 'VALID' | 'REVOKED' | 'NOT_FOUND';
+  status: 'VALID' | 'REVOKED' | 'NOT_FOUND' | 'UNAVAILABLE';
   certificateNumber?: string;
   instituteName?: string;
   courseName?: string;

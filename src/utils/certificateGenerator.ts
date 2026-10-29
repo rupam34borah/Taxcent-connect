@@ -1171,3 +1171,19 @@ export function printMarksheet(doc: AcademicDocument): void {
   `);
   printWindow.document.close();
 }
+
+export function downloadAcademicDocumentPdf(doc: AcademicDocument): void {
+  if (doc.documentType === 'marksheet') {
+    downloadMarksheetPdf(doc);
+    return;
+  }
+  downloadCertificatePdf(doc);
+}
+
+export function printAcademicDocument(doc: AcademicDocument): void {
+  if (doc.documentType === 'marksheet') {
+    printMarksheet(doc);
+    return;
+  }
+  printCertificate(doc);
+}

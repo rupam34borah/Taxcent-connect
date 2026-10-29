@@ -48,9 +48,13 @@ export const PublicVerifyCertificate: React.FC<PublicVerifyCertificateProps> = (
     } catch (err) {
       setResult({
         found: false,
-        status: 'NOT_FOUND',
-        message: 'A temporary network or verification error occurred. Please try again.',
-        disclaimer: 'Verified against Quantum Learning Institute authoritative registry.',
+        status: 'UNAVAILABLE',
+        message: lang === 'as'
+          ? 'পৰীক্ষা সেৱাৰ সৈতে সংযোগ হোৱা নাই। কিছু সময়ৰ পিছত পুনৰ চেষ্টা কৰক।'
+          : err instanceof Error
+            ? err.message
+            : 'A temporary network or verification error occurred. Please try again.',
+        disclaimer: 'The authoritative registry could not be reached, so no verification result was determined.',
       });
     } finally {
       setLoading(false);
@@ -416,6 +420,28 @@ export const PublicVerifyCertificate: React.FC<PublicVerifyCertificateProps> = (
                     <li>If you received a physical certificate recently, it may be undergoing batch indexing. Contact the Ranabari office at <strong>8876824424</strong> to confirm.</li>
                   </ul>
                 </div>
+              </div>
+            )}
+
+            {result.status === 'UNAVAILABLE' && (
+              <div className="bg-slate-800/90 border-2 border-sky-500/70 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-400 flex items-center justify-center text-sky-300 shrink-0">
+                    <Info className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-sky-500 text-slate-950 mb-1">
+                      Verification temporarily unavailable
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white">
+                      {lang === 'as' ? 'পৰীক্ষা সেৱা বৰ্তমান উপলব্ধ নহয়' : 'Could not reach the verification service'}
+                    </h2>
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  {result.message || 'The registry could not be reached, so this certificate’s status has not been determined. Please try again shortly.'}
+                </p>
               </div>
             )}
           </div>
