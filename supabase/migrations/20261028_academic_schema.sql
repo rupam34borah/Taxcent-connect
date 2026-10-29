@@ -527,7 +527,12 @@ CREATE POLICY "Staff append audit logs" ON public.academic_audit_logs
 -- Security: Returns only minimal public verification data. Never returns marks,
 -- full names, phone numbers, email, or private storage download links.
 -- ====================================================================
-CREATE OR REPLACE FUNCTION public.verify_certificate(p_certificate_number TEXT)
+-- The certificates migration created this function with a JSON return type.
+-- PostgreSQL cannot change a function's return type with CREATE OR REPLACE,
+-- so drop the exact signature first and restore its intended public RPC grants.
+DROP FUNCTION IF EXISTS public.verify_certificate(TEXT);
+
+CREATE FUNCTION public.verify_certificate(p_certificate_number TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER -- Runs with elevated security to verify against registry without public read table access
@@ -607,3 +612,6 @@ BEGIN
     );
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.verify_certificate(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.verify_certificate(TEXT) TO anon, authenticated;

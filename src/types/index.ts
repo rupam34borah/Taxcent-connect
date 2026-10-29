@@ -69,5 +69,5 @@ export interface EnquiryRecord {
   location?: string;
   notes?: string;
   submittedAt: string;
-  status: 'saved_locally' | 'sent_whatsapp';
+  status: 'new' | 'contacted' | 'closed';
 }
