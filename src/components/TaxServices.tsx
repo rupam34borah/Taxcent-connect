@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ActiveTab, Language, ServiceItem } from '../types';
 import { TAXCENT_SERVICES, BUSINESS_CONTACTS } from '../data/content';
+import { calculateQuickTax } from '../utils/taxCalculator';
 import { FileText, CheckCircle2, ChevronRight, Phone, MessageSquare, Clock, FileCheck, Calculator, ArrowRight } from 'lucide-react';
 
 interface TaxServicesProps {
@@ -54,31 +55,20 @@ export const TaxServices: React.FC<TaxServicesProps> = ({
   };
 
   // Simple New Regime vs Old Regime comparison calculation for salaried taxpayers
-  const incomeVal = Math.max(0, parseInt(incomeInput || '0', 10));
-  // Under FY 2024-25 / 2025-26 New Regime: Standard deduction Rs 75,000. Up to 3L nil, 3-7L 5%, 7-10L 10% with 87A rebate up to 7L taxable (or 7.75L gross)
-  const taxableNew = Math.max(0, incomeVal - 75000);
-  let taxNew = 0;
-  if (taxableNew <= 700000) {
-    taxNew = 0; // Section 87A full rebate
-  } else {
-    // slab calculation
-    if (taxableNew > 300000) {
-      taxNew += Math.min(taxableNew - 300000, 400000) * 0.05;
-    }
-    if (taxableNew > 700000) {
-      taxNew += Math.min(taxableNew - 700000, 300000) * 0.10;
-    }
-    if (taxableNew > 1000000) {
-      taxNew += Math.min(taxableNew - 1000000, 200000) * 0.15;
-    }
-    if (taxableNew > 1200000) {
-      taxNew += Math.min(taxableNew - 1200000, 300000) * 0.20;
-    }
-    if (taxableNew > 1500000) {
-      taxNew += (taxableNew - 1500000) * 0.30;
-    }
-    taxNew = Math.round(taxNew * 1.04); // 4% cess
-  }
+  const incomeVal = Math.max(0, Number(incomeInput) || 0);
+  const serviceTaxResult = calculateQuickTax({
+    assessmentYear: '2027-28',
+    ageGroup: 'under_60',
+    residentialStatus: 'resident',
+    isSalaried: true,
+    annualIncome: incomeVal,
+    deduction80C: 0,
+    deduction80D: 0,
+    homeLoanInterest24b: 0,
+    otherDeductions: 0,
+  });
+  const taxableNew = serviceTaxResult.newRegime.netTaxableIncome;
+  const taxNew = serviceTaxResult.newRegime.totalTaxPayable;
 
   return (
     <section className="py-12 bg-slate-50 min-h-screen">
@@ -196,10 +186,10 @@ export const TaxServices: React.FC<TaxServicesProps> = ({
                   {lang === 'as' ? 'আনুমানিক কৰ (Cess সহ)' : 'Estimated Tax Payable'}
                 </span>
                 <span className="text-2xl font-bold text-sky-950 font-mono">
-                  {taxNew === 0 ? '₹0 (Zero Tax with 87A Rebate)' : `₹${taxNew.toLocaleString('en-IN')}`}
+                  {taxNew === 0 ? '₹0 estimated tax' : `₹${taxNew.toLocaleString('en-IN')}`}
                 </span>
                 <span className="text-[11px] text-sky-700 block mt-1">
-                  {taxableNew <= 700000 ? 'Eligible for 100% tax rebate under Section 87A!' : 'Subject to specific deductions & exemptions.'}
+                  {taxableNew <= 1200000 ? 'Resident individuals may qualify for a Section 87A rebate up to this taxable income.' : 'Estimate uses the AY 2027-28 new-regime slabs and standard deduction.'}
                 </span>
               </div>
 

@@ -4,6 +4,7 @@ export type TaxpayerAgeGroup = 'under_60' | 'senior' | 'super_senior';
 export interface QuickTaxInputs {
   assessmentYear: AssessmentYear;
   ageGroup: TaxpayerAgeGroup;
+  residentialStatus: 'resident' | 'non_resident';
   isSalaried: boolean;
   annualIncome: number;
   // Quick deductions (for Old Regime)
@@ -140,8 +141,8 @@ function calculateNewRegimeSlabTax(taxableIncome: number, ay: AssessmentYear): n
     if (taxableIncome > 1500000) {
       tax += (taxableIncome - 1500000) * 0.30;
     }
-  } else {
-    // AY 2025-26 & AY 2026-27 (Budget 2024 revised slabs)
+  } else if (ay === '2025-26') {
+    // AY 2025-26 (FY 2024-25), Finance Act 2024
     // 0-3L: Nil
     // 3L-7L: 5% (₹20,000 max)
     // 7L-10L: 10% (₹30,000 max)
@@ -163,6 +164,14 @@ function calculateNewRegimeSlabTax(taxableIncome: number, ay: AssessmentYear): n
     if (taxableIncome > 1500000) {
       tax += (taxableIncome - 1500000) * 0.30;
     }
+  } else {
+    // AY 2026-27 onward (FY 2025-26 onward), Finance Act 2025
+    if (taxableIncome > 400000) tax += Math.min(taxableIncome - 400000, 400000) * 0.05;
+    if (taxableIncome > 800000) tax += Math.min(taxableIncome - 800000, 400000) * 0.10;
+    if (taxableIncome > 1200000) tax += Math.min(taxableIncome - 1200000, 400000) * 0.15;
+    if (taxableIncome > 1600000) tax += Math.min(taxableIncome - 1600000, 400000) * 0.20;
+    if (taxableIncome > 2000000) tax += Math.min(taxableIncome - 2000000, 400000) * 0.25;
+    if (taxableIncome > 2400000) tax += (taxableIncome - 2400000) * 0.30;
   }
 
   return tax;
@@ -249,7 +258,8 @@ function calculateSurcharge(taxableIncome: number, computedTax: number, isNewReg
  * Quick Tax Estimator Calculation
  */
 export function calculateQuickTax(inputs: QuickTaxInputs): TaxCalculationResult {
-  const { assessmentYear, ageGroup, isSalaried, annualIncome } = inputs;
+  const { assessmentYear, ageGroup, residentialStatus, isSalaried, annualIncome } = inputs;
+  const oldRegimeAgeGroup = residentialStatus === 'non_resident' ? 'under_60' : ageGroup;
   const grossTotal = Math.max(0, annualIncome);
 
   // New Regime Standard Deduction:
@@ -267,15 +277,15 @@ export function calculateQuickTax(inputs: QuickTaxInputs): TaxCalculationResult 
   let newRebate87A = 0;
   let newMarginalRelief = 0;
 
-  // Section 87A rebate for New Regime:
-  // Threshold is ₹7,00,000
-  if (newTaxable <= 700000) {
-    newRebate87A = newSlabTax;
+  // Section 87A rebate is available to resident individuals only.
+  const newRebateLimit = assessmentYear === '2024-25' || assessmentYear === '2025-26' ? 700000 : 1200000;
+  const newRebateCap = assessmentYear === '2026-27' || assessmentYear === '2027-28' ? 60000 : 25000;
+  if (residentialStatus === 'resident' && newTaxable <= newRebateLimit) {
+    newRebate87A = Math.min(newSlabTax, newRebateCap);
     newSlabTax = 0;
-  } else {
-    // Marginal relief under Section 87A:
-    // If taxable income slightly exceeds ₹7,00,000, tax cannot exceed income in excess of ₹7,00,000
-    const excessIncome = newTaxable - 700000;
+  } else if (residentialStatus === 'resident' && newTaxable > newRebateLimit) {
+    // Marginal relief prevents a sharp tax increase immediately above the rebate threshold.
+    const excessIncome = newTaxable - newRebateLimit;
     if (newSlabTax > excessIncome) {
       newMarginalRelief = newSlabTax - excessIncome;
       newSlabTax = excessIncome;
@@ -290,7 +300,7 @@ export function calculateQuickTax(inputs: QuickTaxInputs): TaxCalculationResult 
   // Old Regime calculation
   const capped80C = Math.min(150000, Math.max(0, inputs.deduction80C || 0));
   const capped80D = Math.min(
-    ageGroup === 'under_60' ? 25000 : 50000,
+    oldRegimeAgeGroup === 'under_60' ? 25000 : 50000,
     Math.max(0, inputs.deduction80D || 0)
   );
   const capped24b = Math.min(200000, Math.max(0, inputs.homeLoanInterest24b || 0));
@@ -299,10 +309,10 @@ export function calculateQuickTax(inputs: QuickTaxInputs): TaxCalculationResult 
   const oldTotalDeductions = oldRegimeStdDeduction + capped80C + capped80D + capped24b + otherDed;
   const oldTaxable = Math.max(0, grossTotal - oldTotalDeductions);
 
-  let oldSlabTax = calculateOldRegimeSlabTax(oldTaxable, ageGroup);
+  let oldSlabTax = calculateOldRegimeSlabTax(oldTaxable, oldRegimeAgeGroup);
   let oldRebate87A = 0;
   // Sec 87A Old Regime: Taxable income <= ₹5,00,000 receives up to ₹12,500 rebate
-  if (oldTaxable <= 500000) {
+  if (residentialStatus === 'resident' && oldTaxable <= 500000) {
     oldRebate87A = Math.min(oldSlabTax, 12500);
     oldSlabTax = Math.max(0, oldSlabTax - oldRebate87A);
   }
@@ -357,9 +367,9 @@ export function calculateQuickTax(inputs: QuickTaxInputs): TaxCalculationResult 
       chapterVIADeductions: capped80C + capped80D + capped24b + otherDed,
       totalDeductions: oldTotalDeductions,
       netTaxableIncome: oldTaxable,
-      slabTax: calculateOldRegimeSlabTax(oldTaxable, ageGroup),
+      slabTax: calculateOldRegimeSlabTax(oldTaxable, oldRegimeAgeGroup),
       specialRateTax: 0,
-      taxBeforeRebate: calculateOldRegimeSlabTax(oldTaxable, ageGroup),
+      taxBeforeRebate: calculateOldRegimeSlabTax(oldTaxable, oldRegimeAgeGroup),
       rebate87A: oldRebate87A,
       marginalRelief: 0,
       taxAfterRebate: oldSlabTax,
@@ -378,6 +388,7 @@ export function calculateQuickTax(inputs: QuickTaxInputs): TaxCalculationResult 
  */
 export function calculateAdvancedTax(inputs: AdvancedTaxInputs): TaxCalculationResult {
   const { assessmentYear, ageGroup } = inputs;
+  const oldRegimeAgeGroup = inputs.residentialStatus === 'non_resident' ? 'under_60' : ageGroup;
 
   // 1. Salary Head
   const grossSalary = Math.max(0, inputs.grossSalary || 0);
@@ -458,7 +469,7 @@ export function calculateAdvancedTax(inputs: AdvancedTaxInputs): TaxCalculationR
   const capped80C = Math.min(150000, Math.max(0, inputs.deduction80C || 0));
   const capped80CCD1B = Math.min(50000, Math.max(0, inputs.deduction80CCD1B || 0));
   const ded80CCD2 = Math.max(0, inputs.deduction80CCD2 || 0); // Employer NPS (allowed in BOTH!)
-  const capped80D_self = Math.min(ageGroup === 'under_60' ? 25000 : 50000, Math.max(0, inputs.deduction80D_self || 0));
+  const capped80D_self = Math.min(oldRegimeAgeGroup === 'under_60' ? 25000 : 50000, Math.max(0, inputs.deduction80D_self || 0));
   const capped80D_parents = Math.min(50000, Math.max(0, inputs.deduction80D_parents || 0));
   const total80D = capped80D_self + capped80D_parents;
   const ded80E = Math.max(0, inputs.deduction80E || 0);
@@ -466,7 +477,7 @@ export function calculateAdvancedTax(inputs: AdvancedTaxInputs): TaxCalculationR
 
   // 80TTA/80TTB
   let ded80TTA_TTB = 0;
-  if (ageGroup === 'under_60') {
+  if (oldRegimeAgeGroup === 'under_60') {
     ded80TTA_TTB = Math.min(10000, Math.max(0, inputs.savingsBankInterest || 0));
   } else {
     // Senior citizen 80TTB up to 50,000 on all interest
@@ -481,12 +492,12 @@ export function calculateAdvancedTax(inputs: AdvancedTaxInputs): TaxCalculationR
   const oldNormalTaxable = Math.max(0, (grossNormalOld + stcgNormal) - oldSalaryExemptions - oldRegimeStdDeduction - oldTotalChapterVIA);
   const oldTotalTaxable = oldNormalTaxable + stcg111A + taxableLtcg112A + ltcgOther;
 
-  let oldSlabTax = calculateOldRegimeSlabTax(oldNormalTaxable, ageGroup);
+  let oldSlabTax = calculateOldRegimeSlabTax(oldNormalTaxable, oldRegimeAgeGroup);
   let oldPreRebateTax = oldSlabTax + specialCapGainTax;
   let oldRebate87A = 0;
 
-  if (oldTotalTaxable <= 500000) {
-    oldRebate87A = Math.min(oldPreRebateTax, 12500);
+  if (inputs.residentialStatus === 'resident' && oldTotalTaxable <= 500000) {
+    oldRebate87A = Math.min(oldSlabTax, 12500);
     oldPreRebateTax = Math.max(0, oldPreRebateTax - oldRebate87A);
   }
 
@@ -505,14 +516,16 @@ export function calculateAdvancedTax(inputs: AdvancedTaxInputs): TaxCalculationR
   let newPreRebateTax = newSlabTax + specialCapGainTax;
   let newRebate87A = 0;
   let newMarginalRelief = 0;
+  const newRebateLimit = assessmentYear === '2024-25' || assessmentYear === '2025-26' ? 700000 : 1200000;
+  const newRebateCap = assessmentYear === '2026-27' || assessmentYear === '2027-28' ? 60000 : 25000;
 
-  if (newTotalTaxable <= 700000) {
-    newRebate87A = newPreRebateTax;
-    newPreRebateTax = 0;
-  } else {
-    // Marginal relief under Section 87A
-    const excessIncome = newTotalTaxable - 700000;
-    if (newPreRebateTax > excessIncome && newTotalTaxable < 730000) {
+  if (inputs.residentialStatus === 'resident' && newTotalTaxable <= newRebateLimit) {
+    newRebate87A = Math.min(newSlabTax, newRebateCap);
+    newPreRebateTax = Math.max(0, newPreRebateTax - newRebate87A);
+  } else if (inputs.residentialStatus === 'resident' && specialCapGainTax === 0 && newTotalTaxable > newRebateLimit) {
+    // Marginal relief applies only while slab tax exceeds income above the rebate threshold.
+    const excessIncome = newTotalTaxable - newRebateLimit;
+    if (newPreRebateTax > excessIncome && (assessmentYear !== '2025-26' || newTotalTaxable < 727000)) {
       newMarginalRelief = newPreRebateTax - excessIncome;
       newPreRebateTax = excessIncome;
     }
@@ -570,7 +583,7 @@ export function calculateAdvancedTax(inputs: AdvancedTaxInputs): TaxCalculationR
       netTaxableIncome: oldTotalTaxable,
       slabTax: oldSlabTax,
       specialRateTax: specialCapGainTax,
-      taxBeforeRebate: calculateOldRegimeSlabTax(oldNormalTaxable, ageGroup) + specialCapGainTax,
+      taxBeforeRebate: calculateOldRegimeSlabTax(oldNormalTaxable, oldRegimeAgeGroup) + specialCapGainTax,
       rebate87A: oldRebate87A,
       marginalRelief: 0,
       taxAfterRebate: oldPreRebateTax,
