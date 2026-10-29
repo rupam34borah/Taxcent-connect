@@ -958,7 +958,7 @@ export const academicService = {
     if (verifyTimestamps.length >= MAX_VERIFY_REQUESTS_PER_MIN) {
       return {
         found: false,
-        status: 'NOT_FOUND',
+        status: 'UNAVAILABLE',
         disclaimer: 'Temporary rate limit reached to protect student registry privacy. Please wait a moment before trying again.',
         message: 'Too many verification attempts. Please wait 30 seconds before searching again.',
       };
@@ -972,25 +972,29 @@ export const academicService = {
           p_certificate_number: cleanCertNo,
         });
 
-        if (!error && data) {
-          return {
-            found: data.found,
-            status: data.status,
-            certificateNumber: data.certificate_number,
-            instituteName: data.institute_name,
-            courseName: data.course_name,
-            issueDate: data.issue_date,
-            studentMaskedName: data.student_masked_name,
-            documentType: data.document_type,
-            revocationReason: data.revocation_reason,
-            verificationTimestamp: data.verification_timestamp,
-            message: data.message,
-            disclaimer: data.disclaimer || 'Verified against Quantum Learning Institute authoritative registry. This confirms record authenticity at the institute and does not imply autonomous government accreditation.',
-          };
-        }
+        if (error || !data) throw error || new Error('Empty response from certificate verification service.');
+        return {
+          found: data.found,
+          status: data.status,
+          certificateNumber: data.certificate_number,
+          instituteName: data.institute_name,
+          courseName: data.course_name,
+          issueDate: data.issue_date,
+          studentMaskedName: data.student_masked_name,
+          documentType: data.document_type,
+          revocationReason: data.revocation_reason,
+          verificationTimestamp: data.verification_timestamp,
+          message: data.message,
+          disclaimer: data.disclaimer || 'Verified against Quantum Learning Institute authoritative registry. This confirms record authenticity at the institute and does not imply autonomous government accreditation.',
+        };
       } catch (e) {
-        console.warn('RPC check fallback to local authoritative registry:', e);
+        console.error('Certificate verification service failed:', e);
+        throw new Error('Certificate verification is temporarily unavailable. Please try again later.');
       }
+    }
+
+    if (!LOCAL_PREVIEW_ENABLED) {
+      throw new Error('Certificate verification is not configured. Please contact the institute.');
     }
 
     const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
