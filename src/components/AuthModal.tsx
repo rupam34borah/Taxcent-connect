@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Language } from '../types';
+import { academicService } from '../services/academicService';
 import { 
   GraduationCap, 
   UserCheck, 
@@ -13,6 +14,8 @@ import {
   AlertCircle, 
   ShieldAlert,
   Building2,
+  Send,
+  Copy
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -32,6 +35,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isResendMode, setIsResendMode] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState('');
+  const [generatedDirectLink, setGeneratedDirectLink] = useState('');
 
   useEffect(() => {
     if (isAuthModalOpen) {
@@ -39,6 +45,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
       setError('');
       setIdentifier('');
       setPassword('');
+      setIsResendMode(false);
+      setResendSuccess('');
+      setGeneratedDirectLink('');
     }
   }, [isAuthModalOpen, authModalInitialRole]);
 
@@ -65,6 +74,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
       }
     } catch (err: any) {
       setError(err?.message || 'Unexpected login error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identifier.trim()) {
+      setError('Please enter your registered email address.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setResendSuccess('');
+    setGeneratedDirectLink('');
+
+    try {
+      const res = await academicService.resendInvitationLink({
+        email: identifier,
+        kind: activeTab === 'student' ? 'student' : 'staff',
+        operatorName: 'Portal Self-Service',
+      });
+      if (res.success) {
+        setResendSuccess(res.message || 'A setup link has been sent to your email.');
+        if (res.inviteLink) {
+          setGeneratedDirectLink(res.inviteLink);
+        }
+      } else {
+        setError(res.error || 'Could not send setup link. Please contact the academic office.');
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send setup link.');
     } finally {
       setLoading(false);
     }
@@ -114,6 +156,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
             onClick={() => {
               setActiveTab('student');
               setError('');
+              setResendSuccess('');
             }}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all cursor-pointer ${
               activeTab === 'student'
@@ -130,6 +173,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
             onClick={() => {
               setActiveTab('staff');
               setError('');
+              setResendSuccess('');
             }}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all cursor-pointer ${
               activeTab === 'staff'
@@ -146,6 +190,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
             onClick={() => {
               setActiveTab('admin');
               setError('');
+              setResendSuccess('');
             }}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all cursor-pointer ${
               activeTab === 'admin'
@@ -189,71 +234,162 @@ export const AuthModal: React.FC<AuthModalProps> = ({ lang }) => {
             </div>
           )}
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                {activeTab === 'student' 
-                  ? 'Student Registration ID or Email' 
-                  : 'Institutional Email'}
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  {activeTab === 'student' ? <GraduationCap className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-                </div>
-                <input
-                  type="email"
-                  autoComplete="username"
-                  value={identifier}
-                  onChange={e => setIdentifier(e.target.value)}
-                  placeholder={
-                    activeTab === 'student'
-                      ? 'Registered student email'
-                      : 'Institutional email'
-                  }
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-hidden font-mono"
-                />
+          {isResendMode ? (
+            /* Resend Access Link Form */
+            <form onSubmit={handleResendSubmit} className="space-y-4">
+              <div className="p-3.5 rounded-2xl bg-sky-950/60 border border-sky-800/80 text-xs text-sky-200 leading-relaxed">
+                Enter your registered {activeTab === 'student' ? 'student' : 'staff'} email address below. We will send a secure verification & password setup link directly to your inbox.
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Key className="w-4 h-4" />
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Registered Email Address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={identifier}
+                    onChange={e => setIdentifier(e.target.value)}
+                    placeholder="e.g. your.email@example.com"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-hidden font-mono"
+                  />
                 </div>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-hidden font-mono"
-                />
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {loading ? (
-                <span>Signing In...</span>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4" />
-                  <span>
-                    {activeTab === 'student' && 'Log In to Student Portal'}
-                    {activeTab === 'staff' && 'Log In to Staff Hub'}
-                    {activeTab === 'admin' && 'Log In to Admin Console'}
-                  </span>
-                </>
+              {resendSuccess && (
+                <div className="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs space-y-2">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{resendSuccess}</span>
+                  </div>
+                  {generatedDirectLink && (
+                    <div className="bg-slate-950 p-2 rounded-xl border border-emerald-900 font-mono text-[11px] break-all select-all flex items-center justify-between gap-2">
+                      <span className="truncate text-sky-400">{generatedDirectLink}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedDirectLink);
+                          alert('Copied setup link to clipboard!');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold shrink-0 text-[10px] cursor-pointer flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
-            </button>
-          </form>
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResendMode(false);
+                    setError('');
+                    setResendSuccess('');
+                  }}
+                  className="w-1/3 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Back to Login
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{loading ? 'Sending Link...' : 'Resend Link'}</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* Login Form */
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  {activeTab === 'student' 
+                    ? 'Student Registration ID or Email' 
+                    : 'Institutional Email'}
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    {activeTab === 'student' ? <GraduationCap className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                  </div>
+                  <input
+                    type="email"
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={e => setIdentifier(e.target.value)}
+                    placeholder={
+                      activeTab === 'student'
+                        ? 'Registered student email'
+                        : 'Institutional email'
+                    }
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-hidden font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Key className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-hidden font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] pt-1">
+                <span className="text-slate-400">Need credentials?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResendMode(true);
+                    setError('');
+                    setResendSuccess('');
+                  }}
+                  className="text-sky-400 hover:text-sky-300 font-semibold underline cursor-pointer"
+                >
+                  Resend invite link / Forgot password?
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {loading ? (
+                  <span>Signing In...</span>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span>
+                      {activeTab === 'student' && 'Log In to Student Portal'}
+                      {activeTab === 'staff' && 'Log In to Staff Hub'}
+                      {activeTab === 'admin' && 'Log In to Admin Console'}
+                    </span>
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
           <div className="pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 text-center space-y-1">
             <p>

@@ -1395,6 +1395,86 @@ export const academicService = {
     return { success: true };
   },
 
+  async resendInvitationLink(params: {
+    email: string;
+    kind: 'staff' | 'student';
+    fullName?: string;
+    operatorName?: string;
+  }): Promise<{ success: boolean; inviteLink?: string; error?: string; message?: string }> {
+    const email = params.email.trim().toLowerCase();
+    const kind = params.kind;
+    const operatorName = params.operatorName || 'System Administrator';
+
+    if (isSupabaseConfigured && supabase) {
+      let emailDispatched = false;
+      let errorMsg: string | null = null;
+      try {
+        const siteUrl = window.location.origin + window.location.pathname;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${siteUrl}#academic`,
+        });
+        if (!error) {
+          emailDispatched = true;
+        } else {
+          errorMsg = error.message;
+        }
+      } catch (err: unknown) {
+        errorMsg = err instanceof Error ? err.message : 'Auth email dispatch failed';
+      }
+
+      const inviteToken = Math.random().toString(36).substring(2, 12);
+      const inviteLink = `${window.location.origin}${window.location.pathname}#invite?token=${inviteToken}&email=${encodeURIComponent(email)}&kind=${kind}`;
+
+      await logAudit({
+        entityType: kind === 'staff' ? 'STAFF' : 'STUDENT',
+        entityId: email,
+        action: 'UPDATE',
+        performedBy: operatorName,
+        performedByName: operatorName,
+        performedByRole: 'admin',
+        reason: 'Resent portal access and password setup link',
+        details: {
+          email,
+          fullName: params.fullName || email,
+          emailDispatched,
+          errorMsg,
+        },
+      });
+
+      return {
+        success: true,
+        inviteLink,
+        message: emailDispatched
+          ? `Invitation & login setup email dispatched to ${email}. You can also copy the direct verification link below:`
+          : `Direct access setup link generated for ${email}. You can copy and share it directly:`,
+      };
+    }
+
+    const inviteToken = Math.random().toString(36).substring(2, 12);
+    const inviteLink = `${window.location.origin}${window.location.pathname}#invite?token=${inviteToken}&email=${encodeURIComponent(email)}&kind=${kind}`;
+
+    await logAudit({
+      entityType: kind === 'staff' ? 'STAFF' : 'STUDENT',
+      entityId: email,
+      action: 'UPDATE',
+      performedBy: operatorName,
+      performedByName: operatorName,
+      performedByRole: 'admin',
+      reason: 'Resent portal access and password setup link',
+      details: {
+        email,
+        fullName: params.fullName || email,
+        mode: 'local_preview',
+      },
+    });
+
+    return {
+      success: true,
+      inviteLink,
+      message: `Direct access setup link generated for ${email}. You can copy and share it directly:`,
+    };
+  },
+
   async updateStaffPermissions(
     staffId: string, 
     permissions: string[], 

@@ -294,6 +294,38 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
     }
   };
 
+  const handleResendStaffInvite = async (stf: StaffMember) => {
+    const res = await academicService.resendInvitationLink({
+      email: stf.email,
+      fullName: stf.fullName,
+      kind: 'staff',
+      operatorName,
+    });
+    if (res.success && res.inviteLink) {
+      setInviteModalTitle(res.message || `Access & Invitation Link for ${stf.fullName} (${stf.email})`);
+      setGeneratedInviteLink(res.inviteLink);
+      setIsInviteLinkModalOpen(true);
+    } else {
+      alert(res.error || 'Failed to resend invite link.');
+    }
+  };
+
+  const handleResendStudentInvite = async (stu: StudentProfile) => {
+    const res = await academicService.resendInvitationLink({
+      email: stu.email,
+      fullName: stu.fullName,
+      kind: 'student',
+      operatorName,
+    });
+    if (res.success && res.inviteLink) {
+      setInviteModalTitle(res.message || `Access & Invitation Link for ${stu.fullName} (${stu.email})`);
+      setGeneratedInviteLink(res.inviteLink);
+      setIsInviteLinkModalOpen(true);
+    } else {
+      alert(res.error || 'Failed to resend invite link.');
+    }
+  };
+
   // ------------------------------------------------------------------
   // STUDENT ADMISSION ACTIONS
   // ------------------------------------------------------------------
@@ -1118,15 +1150,26 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStaffActive(stf)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                            stf.isActive ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
-                          }`}
-                        >
-                          {stf.isActive ? 'Deactivate' : 'Reactivate'}
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleResendStaffInvite(stf)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 border border-sky-500/30 cursor-pointer transition-colors flex items-center gap-1"
+                            title="Resend invitation and password setup link"
+                          >
+                            <Send className="w-3 h-3" />
+                            <span>Resend Link</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStaffActive(stf)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                              stf.isActive ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                            }`}
+                          >
+                            {stf.isActive ? 'Deactivate' : 'Reactivate'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1225,7 +1268,16 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleResendStudentInvite(stu)}
+                              className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1"
+                              title="Resend student portal access / login setup link"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span>Resend Link</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => {
