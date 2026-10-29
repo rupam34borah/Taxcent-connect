@@ -277,6 +277,8 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
         setInviteModalTitle(`Staff Account Created: ${res.staff.fullName}`);
         setGeneratedInviteLink(res.inviteLink);
         setIsInviteLinkModalOpen(true);
+      } else {
+        alert(`Invitation email sent to ${res.staff.email}. They can sign in after accepting it.`);
       }
     } else {
       alert(res.error || 'Failed to create staff member.');
@@ -331,6 +333,8 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
         setInviteModalTitle(`Student Enrolled: ${res.student.fullName} (${res.student.studentIdCode})`);
         setGeneratedInviteLink(res.inviteLink);
         setIsInviteLinkModalOpen(true);
+      } else {
+        alert(`Invitation email sent to ${res.student.email}. They can sign in after accepting it.`);
       }
     } else {
       alert(res.error || 'Failed to register student.');
@@ -663,8 +667,8 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
   // ------------------------------------------------------------------
   // BACKUP EXPORT
   // ------------------------------------------------------------------
-  const handleDownloadFullBackup = () => {
-    const json = academicService.exportFullBackupJson();
+  const handleDownloadFullBackup = async () => {
+    const json = await academicService.exportFullBackupJson();
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

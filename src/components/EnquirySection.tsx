@@ -1,21 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Language, EnquiryRecord } from '../types';
 import { BUSINESS_CONTACTS } from '../data/content';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { 
-  Send, 
   MessageCircle, 
-  Phone, 
   CheckCircle2, 
-  AlertCircle, 
-  Clock, 
-  Sparkles, 
-  HelpCircle, 
   FileText, 
   GraduationCap, 
-  ShieldCheck,
-  History,
   Copy,
-  ExternalLink
 } from 'lucide-react';
 
 interface EnquirySectionProps {
@@ -51,9 +43,8 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
   // UI & Validation State
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [submittedTicket, setSubmittedTicket] = useState<EnquiryRecord | null>(null);
-  const [history, setHistory] = useState<EnquiryRecord[]>([]);
-  const [showHistory, setShowHistory] = useState<boolean>(false);
-  const [showSheetsGuide, setShowSheetsGuide] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [copiedText, setCopiedText] = useState<boolean>(false);
 
   // Sync initial props
@@ -71,24 +62,12 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
     }
   }, [initialCourse]);
 
-  // Load local submission history
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('taxcent_connect_enquiries');
-      if (saved) {
-        setHistory(JSON.parse(saved));
-      }
-    } catch {
-      // localStorage may be unavailable in some private windows
-    }
-  }, []);
-
   const validatePhone = (phone: string) => {
     const cleaned = phone.replace(/\D/g, '');
     return cleaned.length === 10;
   };
 
-  const handleServiceSubmit = (e: React.FormEvent) => {
+  const handleServiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: { [key: string]: string } = {};
 
@@ -105,8 +84,9 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
     }
 
     setErrors({});
+    setSubmitError('');
     const record: EnquiryRecord = {
-      id: `TC-${Date.now().toString().slice(-6)}`,
+      id: createTicketNumber('TC'),
       type: serviceBusiness === 'taxcent' ? 'tax_service' : 'csc_service',
       businessName: serviceBusiness === 'taxcent' ? 'Taxcent Consulting Services' : 'CSC Ranabari',
       serviceOrCourse: serviceName,
@@ -114,26 +94,14 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
       phone: clientPhone.trim(),
       location: clientLocality.trim() || 'Lakhimpur, Assam',
       notes: serviceNotes.trim(),
-      submittedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-      status: 'saved_locally',
+      submittedAt: new Date().toISOString(),
+      status: 'new',
     };
 
-    saveRecordLocally(record);
-    // Directly dispatch to WhatsApp 8876824424 upon submission
-    dispatchToWhatsApp(record, BUSINESS_CONTACTS.phone1);
-    // Immediately display preview of ticket
-    setSubmittedTicket(record);
-
-    // Scroll smoothly to ticket preview
-    setTimeout(() => {
-      const el = document.getElementById('enquiry-section');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 100);
+    await submitEnquiry(record);
   };
 
-  const handleCourseSubmit = (e: React.FormEvent) => {
+  const handleCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: { [key: string]: string } = {};
 
@@ -150,8 +118,9 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
     }
 
     setErrors({});
+    setSubmitError('');
     const record: EnquiryRecord = {
-      id: `QL-${Date.now().toString().slice(-6)}`,
+      id: createTicketNumber('QL'),
       type: 'course_admission',
       businessName: 'Quantum Learning Institute',
       serviceOrCourse: courseName,
@@ -159,32 +128,59 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
       phone: studentPhone.trim(),
       location: `Qualification: ${studentQualification} | Batch: ${preferredBatch}`,
       notes: courseNotes.trim(),
-      submittedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-      status: 'saved_locally',
+      submittedAt: new Date().toISOString(),
+      status: 'new',
     };
 
-    saveRecordLocally(record);
-    // Directly dispatch to WhatsApp 8876824424 upon submission
-    dispatchToWhatsApp(record, BUSINESS_CONTACTS.phone1);
-    // Immediately display preview of ticket
-    setSubmittedTicket(record);
-
-    // Scroll smoothly to ticket preview
-    setTimeout(() => {
-      const el = document.getElementById('enquiry-section');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 100);
+    await submitEnquiry(record);
   };
 
-  const saveRecordLocally = (record: EnquiryRecord) => {
+  const createTicketNumber = (prefix: string) => {
+    const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID().slice(0, 8).toUpperCase()
+      : Math.random().toString(36).slice(2, 10).toUpperCase();
+    return `${prefix}-${new Date().getFullYear()}-${suffix}`;
+  };
+
+  const submitEnquiry = async (record: EnquiryRecord) => {
+    if (!isSupabaseConfigured || !supabase) {
+      setSubmitError('The enquiry service is not configured yet. Please contact us by phone or WhatsApp.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError('');
     try {
-      const updated = [record, ...history].slice(0, 20);
-      setHistory(updated);
-      localStorage.setItem('taxcent_connect_enquiries', JSON.stringify(updated));
-    } catch {
-      // Ignore storage errors
+      const { data, error } = await supabase
+        .from('enquiries')
+        .insert({
+          ticket_number: record.id,
+          enquiry_type: record.type,
+          business_name: record.businessName,
+          service_or_course: record.serviceOrCourse,
+          client_name: record.clientName,
+          phone: record.phone,
+          location: record.location || null,
+          notes: record.notes || null,
+        })
+        .select('ticket_number, submitted_at')
+        .single();
+
+      if (error) throw error;
+      const savedRecord = {
+        ...record,
+        id: data.ticket_number,
+        submittedAt: data.submitted_at || record.submittedAt,
+      };
+      setSubmittedTicket(savedRecord);
+      setTimeout(() => {
+        document.getElementById('enquiry-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } catch (error) {
+      console.error('Enquiry submission failed:', error);
+      setSubmitError('We could not save your enquiry. Please try again or contact us by phone or WhatsApp.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -260,7 +256,7 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
           <p className="mt-2 text-xs sm:text-sm text-slate-600">
             {lang === 'as'
               ? 'তলৰ ফৰ্মখন পূৰণ কৰক। আপোনাৰ তথ্য প্ৰস্তুত হ’লে পোনে পোনে আমাৰ হোৱাটছএপলৈ প্ৰেৰণ কৰিব পাৰিব অথবা আমাৰ দলে আপোনাক ফোন কৰিব।'
-              : 'Select your requirement below. We validate your details locally and prepare a ready-to-send WhatsApp ticket or direct phone callback.'}
+              : 'Select your requirement below. Your enquiry is saved securely so our team can follow up. You can also send the ticket through WhatsApp.'}
           </p>
         </div>
 
@@ -299,7 +295,7 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
         {/* Confirmation Screen / WhatsApp Action Card if submitted */}
         {submittedTicket ? (
           <div className="rounded-3xl bg-white p-6 sm:p-8 border-2 border-emerald-400 shadow-xl space-y-6 animate-fade-in">
-            {/* Automatic WhatsApp Sent Announcement Banner */}
+            {/* Saved enquiry confirmation */}
             <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
@@ -308,7 +304,7 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full text-white">
-                      Direct WhatsApp Sent
+                      Enquiry saved
                     </span>
                     <span className="text-xs font-mono font-bold text-emerald-100">
                       #{submittedTicket.id}
@@ -316,8 +312,8 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-white mt-0.5">
                     {lang === 'as'
-                      ? 'টিকট হোৱাটছএপলৈ (8876824424) প্ৰেৰণ কৰা হ’ল!'
-                      : 'Ticket Generated & Sent Directly to WhatsApp (+91 88768 24424)!'}
+                      ? 'আপোনাৰ অনুসন্ধান সংৰক্ষণ কৰা হৈছে।'
+                      : 'Your enquiry has been saved.'}
                   </h3>
                 </div>
               </div>
@@ -333,14 +329,14 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                 <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>
                   {lang === 'as'
-                    ? 'আপোনাৰ টিকট স্বয়ংক্ৰিয়ভাৱে হোৱাটছএপত (৮৮৭৬৮২৪৪২৪) প্ৰেৰণ কৰা হৈছে। তলত আপোনাৰ টিকটৰ প্ৰিভিউ দিয়া হ’ল:'
-                    : 'Your ticket details were automatically launched to WhatsApp number 8876824424. Below is your official ticket preview and booking reference:'}
+                    ? 'তলত আপোনাৰ টিকটৰ বিৱৰণ দিয়া হৈছে। আপুনি WhatsApp-ৰ জৰিয়তেও পঠিয়াব পাৰে।'
+                    : 'Your ticket is saved in our enquiry records. You can also send its details to us through WhatsApp:'}
                 </span>
               </p>
               <p className="text-[11px] text-emerald-800">
-                {lang === 'as'
-                  ? 'যদি আপোনাৰ ব্ৰাউজাৰ বা ম’বাইলত হোৱাটছএপ স্বয়ংক্ৰিয়ভাৱে নোলালে, তলৰ সেউজীয়া বুটামত ক্লিক কৰি পুনৰ হোৱাটছএপ মুকলি কৰিব পাৰিব।'
-                  : 'If WhatsApp did not launch automatically due to browser popup restrictions, please tap the green "Open WhatsApp (8876824424)" button below.'}
+                  {lang === 'as'
+                  ? 'WhatsApp-ত পঠিয়াবলৈ তলৰ সেউজীয়া বুটামত ক্লিক কৰক।'
+                  : 'To send a copy through WhatsApp, use the green button below.'}
               </p>
             </div>
 
@@ -358,10 +354,10 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                 <div className="text-right">
                   <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full inline-flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Sent to WhatsApp 8876824424
+                    Saved successfully
                   </span>
                   <span className="block text-[10px] text-slate-500 mt-1 font-mono">
-                    {submittedTicket.submittedAt}
+                    {new Date(submittedTicket.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                   </span>
                 </div>
               </div>
@@ -402,7 +398,7 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
               )}
             </div>
 
-            {/* Action Buttons: WhatsApp Re-open, Alternate Phone, Copy, New Enquiry */}
+            {/* WhatsApp follow-up and ticket actions */}
             <div className="space-y-3 pt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
@@ -456,6 +452,11 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
         ) : (
           /* The Form */
           <div className="rounded-3xl bg-white p-6 sm:p-8 border border-slate-200 shadow-md">
+            {submitError && (
+              <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {submitError}
+              </div>
+            )}
             {formType === 'service' ? (
               /* Service Enquiry Form */
               <form onSubmit={handleServiceSubmit} className="space-y-5">
@@ -631,13 +632,16 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                 <div className="pt-2">
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-sky-600 via-sky-700 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-extrabold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-98"
                   >
                     <MessageCircle className="w-5 h-5 text-emerald-300" />
                     <span>
-                      {lang === 'as'
+                      {isSubmitting
+                        ? 'Saving…'
+                        : lang === 'as'
                         ? 'টিকট বনাওক আৰু হোৱাটছএপত প্ৰেৰণ কৰক (8876824424)'
-                        : 'Generate Ticket & Send to WhatsApp (8876824424)'}
+                        : 'Save Enquiry & Continue to WhatsApp'}
                     </span>
                   </button>
                   <p className="text-[11px] text-slate-500 text-center mt-2 flex items-center justify-center gap-1">
@@ -645,7 +649,7 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                     <span>
                       {lang === 'as'
                         ? 'দাখিল কৰাৰ লগে লগে ৮৮৭৬৮২৪৪২৪ নম্বৰত হোৱাটছএপ মুকলি হ’ব আৰু স্ক্ৰীণত টিকটৰ প্ৰিভিউ ওলাব।'
-                        : 'Directly opens WhatsApp (+91 88768 24424) & instantly shows your official ticket preview.'}
+                        : 'Your details are saved securely before the ticket is shown.'}
                     </span>
                   </p>
                 </div>
@@ -763,13 +767,16 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                 <div className="pt-2">
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-blue-700 via-blue-800 to-emerald-600 hover:from-blue-600 hover:to-emerald-500 text-white font-extrabold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-98"
                   >
                     <MessageCircle className="w-5 h-5 text-emerald-300" />
                     <span>
-                      {lang === 'as'
+                      {isSubmitting
+                        ? 'Saving…'
+                        : lang === 'as'
                         ? 'নামভৰ্তি টিকট বনাওক আৰু হোৱাটছএপত প্ৰেৰণ কৰক (8876824424)'
-                        : 'Generate Admission Ticket & Send to WhatsApp (8876824424)'}
+                        : 'Save Admission Enquiry & Continue to WhatsApp'}
                     </span>
                   </button>
                   <p className="text-[11px] text-slate-500 text-center mt-2 flex items-center justify-center gap-1">
@@ -777,7 +784,7 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
                     <span>
                       {lang === 'as'
                         ? 'দাখিল কৰাৰ লগে লগে ৮৮৭৬৮২৪৪২৪ নম্বৰত হোৱাটছএপ মুকলি হ’ব আৰু স্ক্ৰীণত টিকটৰ প্ৰিভিউ ওলাব।'
-                        : 'Directly opens WhatsApp (+91 88768 24424) & instantly shows your official ticket preview.'}
+                        : 'Your details are saved securely before the ticket is shown.'}
                     </span>
                   </p>
                 </div>
@@ -786,30 +793,7 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
           </div>
         )}
 
-        {/* Local History Drawer Toggle & Google Sheet Connector Guide */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-200">
-          <div className="flex items-center gap-3">
-            {history.length > 0 && (
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs cursor-pointer"
-              >
-                <History className="w-3.5 h-3.5 text-sky-600" />
-                <span>
-                  {showHistory ? 'Hide History' : `My Past Enquiries (${history.length})`}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setShowSheetsGuide(!showSheetsGuide)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs cursor-pointer"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{showSheetsGuide ? 'Hide Google Sheets Guide' : 'Connect Google Sheets / Forms (Free)'}</span>
-            </button>
-          </div>
-
+        <div className="mt-8 flex flex-wrap items-center justify-end gap-4 pt-6 border-t border-slate-200">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span>Direct Call:</span>
             <a href={`tel:${BUSINESS_CONTACTS.phone1}`} className="font-semibold text-slate-800 hover:underline">
@@ -822,66 +806,6 @@ export const EnquirySection: React.FC<EnquirySectionProps> = ({
           </div>
         </div>
 
-        {/* Past Enquiries List */}
-        {showHistory && history.length > 0 && (
-          <div className="mt-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Recent Client Enquiries Stored in This Browser
-            </h4>
-            <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
-              {history.map((rec) => (
-                <div key={rec.id} className="py-2.5 flex items-center justify-between text-xs gap-3">
-                  <div>
-                    <span className="font-mono text-[10px] text-sky-700 font-bold block">{rec.id}</span>
-                    <span className="font-bold text-slate-900">{rec.clientName}</span>
-                    <span className="text-slate-500 ml-2">({rec.serviceOrCourse})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">{rec.submittedAt}</span>
-                    <button
-                      onClick={() => dispatchToWhatsApp(rec, BUSINESS_CONTACTS.phone1)}
-                      className="px-2.5 py-1 rounded-md bg-[#25D366] text-slate-950 font-bold text-[10px] hover:bg-[#20ba59] cursor-pointer"
-                    >
-                      WhatsApp (8876824424)
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Google Sheets / Forms Free Integration Guide */}
-        {showSheetsGuide && (
-          <div className="mt-4 p-6 rounded-2xl bg-white border border-emerald-200 shadow-sm text-xs text-slate-700 space-y-3">
-            <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <h4 className="font-bold text-slate-900 text-sm">
-                How to Receive Leads Automatically into a Free Google Sheet:
-              </h4>
-            </div>
-            <p className="leading-relaxed">
-              Because you have a <strong>₹0 zero budget</strong>, you do NOT need to pay for any backend database (like Firebase or PostgreSQL) if you just want to collect leads! Here is how to configure it completely free:
-            </p>
-            <ol className="list-decimal list-inside space-y-2 text-slate-600 pl-1">
-              <li>
-                <strong>Option A (Ready right now):</strong> When a client clicks <em>"Submit"</em>, the app pre-fills their exact details directly into your WhatsApp (8876824424 / 8638270649). You receive an instant alert on your phone with zero setup and zero cost.
-              </li>
-              <li>
-                <strong>Option B (Google Form Webhook):</strong> Create a simple free Google Form with fields: <em>Name, Phone, Service/Course, Locality</em>.
-              </li>
-              <li>
-                Link that Google Form to a <strong>Google Sheet</strong> (one click in Google Forms &gt; Responses &gt; Link to Sheets).
-              </li>
-              <li>
-                Copy the Google Form submission URL (<code>formResponse</code>) and paste it into this app’s configuration to log every lead into your Google Sheet automatically!
-              </li>
-            </ol>
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-950 text-[11px]">
-              💡 <em>This app is engineered to be 100% cost-free forever with no paid servers or maintenance fees.</em>
-            </div>
-          </div>
-        )}
       </div>
     </section>
   );

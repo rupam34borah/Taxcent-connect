@@ -178,7 +178,7 @@ const INITIAL_BATCHES: BatchItem[] = [
   },
 ];
 
-const INITIAL_STAFF: StaffMember[] = [
+const INITIAL_STAFF: StaffMember[] = import.meta.env.DEV ? [
   {
     id: 'stf-001',
     staffIdCode: 'QLI-STF-2025-001',
@@ -224,9 +224,9 @@ const INITIAL_STAFF: StaffMember[] = [
     invitationStatus: 'active',
     createdAt: '2026-02-15T11:30:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_STUDENTS: StudentProfile[] = [
+const INITIAL_STUDENTS: StudentProfile[] = import.meta.env.DEV ? [
   {
     id: 'stu-001',
     studentIdCode: 'QLI-STU-2026-001',
@@ -300,9 +300,9 @@ const INITIAL_STUDENTS: StudentProfile[] = [
     isPortalActive: true,
     invitationStatus: 'active',
   },
-];
+ ] : [];
 
-const INITIAL_DOCUMENTS: AcademicDocument[] = [
+const INITIAL_DOCUMENTS: AcademicDocument[] = import.meta.env.DEV ? [
   {
     id: 'doc-001',
     studentId: 'stu-001',
@@ -476,9 +476,9 @@ const INITIAL_DOCUMENTS: AcademicDocument[] = [
     examAnswerSheetFileName: 'Manash_Nath_DTP_Final_Evaluated_Answer_Sheet.pdf',
     examAnswerSheetMimeType: 'application/pdf',
   },
-];
+ ] : [];
 
-const INITIAL_ATTENDANCE: AttendanceRecord[] = [
+const INITIAL_ATTENDANCE: AttendanceRecord[] = import.meta.env.DEV ? [
   {
     id: 'att-001',
     personType: 'student',
@@ -551,9 +551,9 @@ const INITIAL_ATTENDANCE: AttendanceRecord[] = [
     markedBy: 'Biometric System / Admin Punch',
     markedAt: new Date().toISOString(),
   },
-];
+ ] : [];
 
-const INITIAL_ASSESSMENTS: AssessmentItem[] = [
+const INITIAL_ASSESSMENTS: AssessmentItem[] = import.meta.env.DEV ? [
   {
     id: 'asm-001',
     title: 'DCA Mid-Term Practical & Theory Examination',
@@ -584,9 +584,9 @@ const INITIAL_ASSESSMENTS: AssessmentItem[] = [
     approvedBy: 'Prof. Debajit Saikia (Admin)',
     createdAt: '2026-05-15T11:00:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_MARKS: StudentMarkRecord[] = [
+const INITIAL_MARKS: StudentMarkRecord[] = import.meta.env.DEV ? [
   {
     id: 'mrk-001',
     assessmentId: 'asm-001',
@@ -619,9 +619,9 @@ const INITIAL_MARKS: StudentMarkRecord[] = [
     approvedBy: 'Prof. Debajit Saikia (Admin)',
     updatedAt: '2026-05-18T14:00:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_LEARNING_MATERIALS: LearningResourceItem[] = [
+const INITIAL_LEARNING_MATERIALS: LearningResourceItem[] = import.meta.env.DEV ? [
   {
     id: 'mat-001',
     title: 'DCA Complete Official Curriculum & Examination Blueprint 2026',
@@ -679,9 +679,9 @@ const INITIAL_LEARNING_MATERIALS: LearningResourceItem[] = [
     uploadedBy: 'Ananya Dutta',
     uploadedAt: '2026-03-05T14:10:00Z',
   },
-];
+ ] : [];
 
-const INITIAL_MOCK_TESTS: MockTestItem[] = [
+const INITIAL_MOCK_TESTS: MockTestItem[] = import.meta.env.DEV ? [
   {
     id: 'test-dca-01',
     title: 'DCA Computer Fundamentals & MS Office Mastery Test',
@@ -800,7 +800,7 @@ const INITIAL_MOCK_TESTS: MockTestItem[] = [
       },
     ],
   },
-];
+ ] : [];
 
 const INITIAL_GOVT_PAPERS: GovtExamPaperItem[] = [
   {
@@ -866,8 +866,15 @@ export function maskStudentName(fullName: string): string {
     .join(' ');
 }
 
-// Helpers for localStorage retrieval with fallback
+// Browser storage is only a development preview. It is never an authority for
+// authentication, academic records, grades, or certificate verification.
+const LOCAL_PREVIEW_ENABLED = import.meta.env.DEV && !isSupabaseConfigured;
+
 function loadFromStorage<T>(key: string, defaultData: T): T {
+  if (!LOCAL_PREVIEW_ENABLED) {
+    return (Array.isArray(defaultData) ? [] : defaultData) as T;
+  }
+
   try {
     const raw = localStorage.getItem(key);
     if (!raw) {
@@ -881,6 +888,10 @@ function loadFromStorage<T>(key: string, defaultData: T): T {
 }
 
 function saveToStorage<T>(key: string, data: T): void {
+  if (!LOCAL_PREVIEW_ENABLED) {
+    throw new Error('Local academic storage is disabled outside the development preview.');
+  }
+
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (err) {
@@ -888,7 +899,27 @@ function saveToStorage<T>(key: string, data: T): void {
   }
 }
 
-function logAudit(audit: Omit<AcademicAuditLog, 'id' | 'createdAt'>): void {
+async function logAudit(audit: Omit<AcademicAuditLog, 'id' | 'createdAt'>): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) throw new Error('Sign in is required to write an audit entry.');
+    const { data: role, error: roleError } = await supabase.rpc('get_auth_role');
+    if (roleError) throw roleError;
+    const { error } = await supabase.from('academic_audit_logs').insert({
+      entity_type: audit.entityType,
+      entity_id: audit.entityId,
+      action: audit.action,
+      performed_by_id: authData.user.id,
+      performed_by_name: authData.user.user_metadata?.full_name || authData.user.email || audit.performedByName,
+      performed_by_role: role || 'student',
+      reason: audit.reason || null,
+      details: audit.details || {},
+    });
+    if (error) throw error;
+    return;
+  }
+
+  if (!LOCAL_PREVIEW_ENABLED) return;
   try {
     const logs = loadFromStorage<AcademicAuditLog[]>(STORAGE_KEYS.AUDIT, []);
     const entry: AcademicAuditLog = {
@@ -1008,14 +1039,52 @@ export const academicService = {
   // 2. COURSES & BATCHES MANAGEMENT
   // ------------------------------------------------------------------
   async getCourses(): Promise<CourseItem[]> {
-    return loadFromStorage<CourseItem[]>(STORAGE_KEYS.COURSES, INITIAL_COURSES);
+    if (!isSupabaseConfigured || !supabase) return loadFromStorage<CourseItem[]>(STORAGE_KEYS.COURSES, INITIAL_COURSES);
+    const { data, error } = await supabase.from('courses').select('*').order('name');
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      durationMonths: row.duration_months,
+      description: row.description || '',
+      syllabusTopics: Array.isArray(row.syllabus_topics) ? row.syllabus_topics : [],
+      isActive: row.is_active !== false,
+    }));
   },
 
   async getBatches(): Promise<BatchItem[]> {
-    return loadFromStorage<BatchItem[]>(STORAGE_KEYS.BATCHES, INITIAL_BATCHES);
+    if (!isSupabaseConfigured || !supabase) return loadFromStorage<BatchItem[]>(STORAGE_KEYS.BATCHES, INITIAL_BATCHES);
+    const { data, error } = await supabase.from('batches').select('*, courses(name)').order('start_date', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      courseId: row.course_id,
+      courseName: row.courses?.name || '',
+      batchCode: row.batch_code,
+      batchName: row.batch_name,
+      timing: row.timing || '',
+      startDate: row.start_date,
+      endDate: row.end_date || undefined,
+      status: row.status || 'active',
+    }));
   },
 
   async createCourse(course: Omit<CourseItem, 'id'>, performedBy: string): Promise<CourseItem> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('courses').insert({
+        code: course.code.trim().toUpperCase(),
+        name: course.name.trim(),
+        duration_months: course.durationMonths,
+        description: course.description,
+        syllabus_topics: course.syllabusTopics,
+        is_active: course.isActive,
+      }).select('*').single();
+      if (error) throw error;
+      const created: CourseItem = { id: data.id, code: data.code, name: data.name, durationMonths: data.duration_months, description: data.description || '', syllabusTopics: data.syllabus_topics || [], isActive: data.is_active };
+      await logAudit({ entityType: 'SYLLABUS', entityId: created.id, action: 'CREATE', performedBy, performedByName: performedBy, performedByRole: 'staff', details: { courseName: created.name, code: created.code } });
+      return created;
+    }
     const list = await this.getCourses();
     const newCourse: CourseItem = {
       ...course,
@@ -1023,7 +1092,7 @@ export const academicService = {
     };
     list.push(newCourse);
     saveToStorage(STORAGE_KEYS.COURSES, list);
-    logAudit({
+    await logAudit({
       entityType: 'SYLLABUS',
       entityId: newCourse.id,
       action: 'CREATE',
@@ -1036,6 +1105,21 @@ export const academicService = {
   },
 
   async createBatch(batch: Omit<BatchItem, 'id'>, performedBy: string): Promise<BatchItem> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('batches').insert({
+        course_id: batch.courseId || null,
+        batch_code: batch.batchCode.trim().toUpperCase(),
+        batch_name: batch.batchName.trim(),
+        timing: batch.timing,
+        start_date: batch.startDate,
+        end_date: batch.endDate || null,
+        status: batch.status,
+      }).select('*, courses(name)').single();
+      if (error) throw error;
+      const created: BatchItem = { id: data.id, courseId: data.course_id, courseName: data.courses?.name || batch.courseName, batchCode: data.batch_code, batchName: data.batch_name, timing: data.timing || '', startDate: data.start_date, endDate: data.end_date || undefined, status: data.status || 'active' };
+      await logAudit({ entityType: 'SYLLABUS', entityId: created.id, action: 'CREATE', performedBy, performedByName: performedBy, performedByRole: 'staff', details: { batchCode: created.batchCode, batchName: created.batchName } });
+      return created;
+    }
     const list = await this.getBatches();
     const newBatch: BatchItem = {
       ...batch,
@@ -1043,7 +1127,7 @@ export const academicService = {
     };
     list.push(newBatch);
     saveToStorage(STORAGE_KEYS.BATCHES, list);
-    logAudit({
+    await logAudit({
       entityType: 'SYLLABUS',
       entityId: newBatch.id,
       action: 'CREATE',
@@ -1059,6 +1143,18 @@ export const academicService = {
   // 3. STAFF MANAGEMENT (Admin only)
   // ------------------------------------------------------------------
   async getStaffMembers(): Promise<StaffMember[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('institute_staff').select('*').order('full_name');
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        id: row.id, userId: row.user_id || undefined, staffIdCode: row.staff_id_code,
+        fullName: row.full_name, email: row.email, phone: row.phone || '',
+        designation: row.designation || 'Instructor', role: row.role,
+        permissions: row.permissions || [], assignedCourses: row.assigned_courses || [],
+        assignedBatches: row.assigned_batches || [], isActive: row.is_active !== false,
+        invitationStatus: row.invitation_status || 'active', createdAt: row.created_at,
+      }));
+    }
     return loadFromStorage<StaffMember[]>(STORAGE_KEYS.STAFF, INITIAL_STAFF);
   },
 
@@ -1073,6 +1169,16 @@ export const academicService = {
     assignedBatches: string[];
     adminName: string;
   }): Promise<{ success: boolean; staff?: StaffMember; error?: string; inviteLink?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const email = params.email.trim().toLowerCase();
+      const staffIdCode = `QLI-STF-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { kind: 'staff', fullName: params.fullName.trim(), email, phone: params.phone.trim(), designation: params.designation.trim() || 'Instructor', role: params.role, permissions: params.permissions, assignedCourses: params.assignedCourses, assignedBatches: params.assignedBatches, staffIdCode },
+      });
+      if (error || !data?.staff) return { success: false, error: error?.message || data?.error || 'Could not invite this staff member.' };
+      const row = data.staff;
+      return { success: true, staff: { id: row.id, userId: row.user_id, staffIdCode: row.staff_id_code, fullName: row.full_name, email: row.email, phone: row.phone || '', designation: row.designation || 'Instructor', role: row.role, permissions: row.permissions || [], assignedCourses: row.assigned_courses || [], assignedBatches: row.assigned_batches || [], isActive: row.is_active !== false, invitationStatus: row.invitation_status || 'pending', createdAt: row.created_at } };
+    }
     const staffList = await this.getStaffMembers();
     const emailNorm = params.email.trim().toLowerCase();
 
@@ -1107,7 +1213,7 @@ export const academicService = {
     const inviteToken = Math.random().toString(36).substring(2, 12);
     const inviteLink = `${window.location.origin}${window.location.pathname}#invite?token=${inviteToken}&email=${encodeURIComponent(emailNorm)}`;
 
-    logAudit({
+    await logAudit({
       entityType: 'STAFF',
       entityId: newStaff.id,
       action: 'CREATE',
@@ -1126,6 +1232,15 @@ export const academicService = {
   },
 
   async toggleStaffActive(staffId: string, adminName: string, reason?: string): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: staff, error: readError } = await supabase.from('institute_staff').select('is_active,staff_id_code,full_name').eq('id', staffId).single();
+      if (readError) return { success: false, error: readError.message };
+      const nextActive = !staff.is_active;
+      const { error } = await supabase.from('institute_staff').update({ is_active: nextActive, invitation_status: nextActive ? 'active' : 'revoked', updated_at: new Date().toISOString() }).eq('id', staffId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'STAFF', entityId: staffId, action: nextActive ? 'RESTORE' : 'REVOKE', performedBy: adminName, performedByName: adminName, performedByRole: 'admin', reason, details: { staffIdCode: staff.staff_id_code, fullName: staff.full_name, isActive: nextActive } });
+      return { success: true };
+    }
     const staffList = await this.getStaffMembers();
     const staff = staffList.find(s => s.id === staffId);
     if (!staff) return { success: false, error: 'Staff member not found.' };
@@ -1133,7 +1248,7 @@ export const academicService = {
     staff.isActive = !staff.isActive;
     saveToStorage(STORAGE_KEYS.STAFF, staffList);
 
-    logAudit({
+    await logAudit({
       entityType: 'STAFF',
       entityId: staff.id,
       action: staff.isActive ? 'RESTORE' : 'REVOKE',
@@ -1154,6 +1269,12 @@ export const academicService = {
     assignedBatches: string[], 
     adminName: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('institute_staff').update({ permissions, assigned_courses: assignedCourses, assigned_batches: assignedBatches, updated_at: new Date().toISOString() }).eq('id', staffId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'STAFF', entityId: staffId, action: 'UPDATE', performedBy: adminName, performedByName: adminName, performedByRole: 'admin', details: { permissions, assignedCourses, assignedBatches } });
+      return { success: true };
+    }
     const staffList = await this.getStaffMembers();
     const staff = staffList.find(s => s.id === staffId);
     if (!staff) return { success: false, error: 'Staff member not found.' };
@@ -1163,7 +1284,7 @@ export const academicService = {
     staff.assignedBatches = assignedBatches;
     saveToStorage(STORAGE_KEYS.STAFF, staffList);
 
-    logAudit({
+    await logAudit({
       entityType: 'STAFF',
       entityId: staff.id,
       action: 'UPDATE',
@@ -1187,7 +1308,7 @@ export const academicService = {
           .select('*')
           .order('full_name', { ascending: true });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data.map((d: any) => ({
             id: d.id,
             userId: d.user_id,
@@ -1204,8 +1325,10 @@ export const academicService = {
             isPortalActive: d.is_portal_active !== false,
           }));
         }
+        if (error) throw error;
       } catch (err) {
-        console.warn('Supabase students fallback:', err);
+        console.error('Could not load students from Supabase:', err);
+        throw err;
       }
     }
     return loadFromStorage<StudentProfile[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
@@ -1223,6 +1346,15 @@ export const academicService = {
     operatorName: string;
     operatorRole: string;
   }): Promise<{ success: boolean; student?: StudentProfile; error?: string; inviteLink?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const studentIdCode = `QLI-STU-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { kind: 'student', fullName: params.fullName.trim(), email: params.email.trim().toLowerCase(), phone: params.phone.trim(), courseId: params.courseId, courseName: params.courseName, batchId: params.batchId || null, batchCode: params.batchCode || null, admissionDate: params.admissionDate || new Date().toISOString().slice(0, 10), operatorName: params.operatorName, studentIdCode },
+      });
+      if (error || !data?.student) return { success: false, error: error?.message || data?.error || 'Could not invite this student.' };
+      const row = data.student;
+      return { success: true, student: { id: row.id, userId: row.user_id || undefined, studentIdCode: row.student_id_code, fullName: row.full_name, email: row.email, phone: row.phone || '', enrolledCourse: row.enrolled_course_name || '', enrolledCourseId: row.enrolled_course_id || undefined, batchId: row.batch_id || undefined, batchCode: row.batch_code || undefined, admissionDate: row.admission_date, enrolmentStatus: row.enrolment_status || 'active', isPortalActive: row.is_portal_active !== false, invitationStatus: row.invitation_status || 'pending' } };
+    }
     const students = await this.getStudentProfiles();
     const emailNorm = params.email.trim().toLowerCase();
 
@@ -1275,7 +1407,7 @@ export const academicService = {
     const inviteToken = Math.random().toString(36).substring(2, 10);
     const inviteLink = `${window.location.origin}${window.location.pathname}#setup-student?token=${inviteToken}&roll=${encodeURIComponent(studentIdCode)}`;
 
-    logAudit({
+    await logAudit({
       entityType: 'STUDENT',
       entityId: newStudent.id,
       action: 'CREATE',
@@ -1300,6 +1432,23 @@ export const academicService = {
     operatorName: string,
     operatorRole: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const row: Record<string, unknown> = {};
+      if (updates.fullName !== undefined) row.full_name = updates.fullName;
+      if (updates.email !== undefined) row.email = updates.email.trim().toLowerCase();
+      if (updates.phone !== undefined) row.phone = updates.phone;
+      if (updates.enrolledCourse !== undefined) row.enrolled_course_name = updates.enrolledCourse;
+      if (updates.enrolledCourseId !== undefined) row.enrolled_course_id = updates.enrolledCourseId || null;
+      if (updates.batchId !== undefined) row.batch_id = updates.batchId || null;
+      if (updates.batchCode !== undefined) row.batch_code = updates.batchCode || null;
+      if (updates.enrolmentStatus !== undefined) row.enrolment_status = updates.enrolmentStatus;
+      if (updates.isPortalActive !== undefined) row.is_portal_active = updates.isPortalActive;
+      row.updated_at = new Date().toISOString();
+      const { error } = await supabase.from('student_profiles').update(row).eq('id', studentId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'STUDENT', entityId: studentId, action: 'CORRECTION', performedBy: operatorName, performedByName: operatorName, performedByRole: operatorRole, reason, details: { updates } });
+      return { success: true };
+    }
     const students = await this.getStudentProfiles();
     const index = students.findIndex(s => s.id === studentId);
     if (index === -1) return { success: false, error: 'Student not found.' };
@@ -1308,7 +1457,7 @@ export const academicService = {
     students[index] = { ...students[index], ...updates };
     saveToStorage(STORAGE_KEYS.STUDENTS, students);
 
-    logAudit({
+    await logAudit({
       entityType: 'STUDENT',
       entityId: studentId,
       action: 'CORRECTION',
@@ -1327,6 +1476,15 @@ export const academicService = {
     operatorName: string,
     reason: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error: readError } = await supabase.from('student_profiles').select('is_portal_active,student_id_code').eq('id', studentId).single();
+      if (readError) return { success: false, error: readError.message };
+      const nextActive = !data.is_portal_active;
+      const { error } = await supabase.from('student_profiles').update({ is_portal_active: nextActive, updated_at: new Date().toISOString() }).eq('id', studentId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'STUDENT', entityId: studentId, action: nextActive ? 'RESTORE' : 'REVOKE', performedBy: operatorName, performedByName: operatorName, performedByRole: 'admin', reason, details: { studentIdCode: data.student_id_code, isPortalActive: nextActive } });
+      return { success: true };
+    }
     const students = await this.getStudentProfiles();
     const student = students.find(s => s.id === studentId);
     if (!student) return { success: false, error: 'Student not found.' };
@@ -1334,7 +1492,7 @@ export const academicService = {
     student.isPortalActive = !student.isPortalActive;
     saveToStorage(STORAGE_KEYS.STUDENTS, students);
 
-    logAudit({
+    await logAudit({
       entityType: 'STUDENT',
       entityId: student.id,
       action: student.isPortalActive ? 'RESTORE' : 'REVOKE',
@@ -1352,6 +1510,22 @@ export const academicService = {
   // 5. ATTENDANCE MANAGEMENT (Student & Staff with Duplicate Prevention)
   // ------------------------------------------------------------------
   async getAllAttendance(personType?: PersonType): Promise<AttendanceRecord[]> {
+    if (isSupabaseConfigured && supabase) {
+      const loadStudents = personType !== 'staff';
+      const loadStaff = personType !== 'student';
+      const result: AttendanceRecord[] = [];
+      if (loadStudents) {
+        const { data, error } = await supabase.from('student_attendance').select('*, student_profiles(full_name, student_id_code, enrolled_course_name), batches(batch_code), institute_staff(full_name)').order('attendance_date', { ascending: false });
+        if (error) throw error;
+        for (const row of data || []) result.push({ id: row.id, personType: 'student', personId: row.student_id, personName: row.student_profiles?.full_name || '', identifierCode: row.student_profiles?.student_id_code || '', courseOrDept: row.student_profiles?.enrolled_course_name || '', batchId: row.batch_id || undefined, batchCode: row.batches?.batch_code || '', date: row.attendance_date, sessionName: row.session_name || 'default', status: row.status, reason: row.reason || undefined, markedBy: row.institute_staff?.full_name || '', markedAt: row.created_at, correctionHistory: row.correction_history || [] });
+      }
+      if (loadStaff) {
+        const { data, error } = await supabase.from('staff_attendance').select('*, institute_staff(full_name, staff_id_code, designation)').order('attendance_date', { ascending: false });
+        if (error) throw error;
+        for (const row of data || []) result.push({ id: row.id, personType: 'staff', personId: row.staff_id, personName: row.institute_staff?.full_name || '', identifierCode: row.institute_staff?.staff_id_code || '', courseOrDept: row.institute_staff?.designation || '', date: row.attendance_date, sessionName: 'default', status: row.status, punchInTime: row.punch_in_time || undefined, punchOutTime: row.punch_out_time || undefined, reason: row.reason || undefined, markedBy: '', markedAt: row.created_at, correctionHistory: row.correction_history || [] });
+      }
+      return result.sort((a, b) => b.date.localeCompare(a.date));
+    }
     const studentList = loadFromStorage<AttendanceRecord[]>(STORAGE_KEYS.ATTENDANCE_STUDENT, INITIAL_ATTENDANCE);
     if (!personType) return studentList;
     return studentList.filter(a => a.personType === personType);
@@ -1374,6 +1548,28 @@ export const academicService = {
     markedBy: string;
     markedByRole: string;
   }): Promise<{ success: boolean; count: number; error?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) return { success: false, count: 0, error: 'Sign in before marking attendance.' };
+      const { data: staff, error: staffError } = await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).maybeSingle();
+      if (staffError || !staff) return { success: false, count: 0, error: 'Your staff roster record was not found.' };
+      const sessionName = params.sessionName || 'default';
+      if (params.personType === 'student') {
+        const rows = params.records.map(item => ({ student_id: item.personId, batch_id: item.batchId || null, attendance_date: params.date, session_name: sessionName, status: item.status, reason: item.reason || null, marked_by_staff_id: staff.id, updated_at: new Date().toISOString() }));
+        if (rows.length) {
+          const { error } = await supabase.from('student_attendance').upsert(rows, { onConflict: 'student_id,attendance_date,session_name' });
+          if (error) return { success: false, count: 0, error: error.message };
+        }
+      } else {
+        const rows = params.records.map(item => ({ staff_id: item.personId, attendance_date: params.date, status: item.status, reason: item.reason || null, updated_at: new Date().toISOString() }));
+        if (rows.length) {
+          const { error } = await supabase.from('staff_attendance').upsert(rows, { onConflict: 'staff_id,attendance_date' });
+          if (error) return { success: false, count: 0, error: error.message };
+        }
+      }
+      await logAudit({ entityType: 'ATTENDANCE', entityId: `${params.personType}_${params.date}_${sessionName}`, action: 'UPDATE', performedBy: params.markedBy, performedByName: params.markedBy, performedByRole: params.markedByRole, details: { date: params.date, sessionName, totalUpdated: params.records.length } });
+      return { success: true, count: params.records.length };
+    }
     const list = loadFromStorage<AttendanceRecord[]>(STORAGE_KEYS.ATTENDANCE_STUDENT, INITIAL_ATTENDANCE);
     const sessionName = params.sessionName || 'default';
     let savedCount = 0;
@@ -1425,7 +1621,7 @@ export const academicService = {
 
     saveToStorage(STORAGE_KEYS.ATTENDANCE_STUDENT, list);
 
-    logAudit({
+    await logAudit({
       entityType: 'ATTENDANCE',
       entityId: `${params.personType}_${params.date}_${sessionName}`,
       action: 'UPDATE',
@@ -1453,6 +1649,19 @@ export const academicService = {
       return { success: false, error: 'A mandatory justification reason must be provided for attendance correction.' };
     }
 
+    if (isSupabaseConfigured && supabase) {
+      const { data: studentRec } = await supabase.from('student_attendance').select('*').eq('id', params.recordId).maybeSingle();
+      const { data: staffRec } = studentRec ? { data: null } : await supabase.from('staff_attendance').select('*').eq('id', params.recordId).maybeSingle();
+      const current = studentRec || staffRec;
+      if (!current) return { success: false, error: 'Attendance record not found.' };
+      const table = studentRec ? 'student_attendance' : 'staff_attendance';
+      const oldStatus = current.status as AttendanceStatus;
+      const history = Array.isArray(current.correction_history) ? current.correction_history : [];
+      const { error } = await supabase.from(table).update({ status: params.newStatus, reason: params.reason.trim(), correction_history: [...history, { correctedAt: new Date().toISOString(), correctedBy: params.correctedBy, oldStatus, newStatus: params.newStatus, reason: params.reason.trim() }], updated_at: new Date().toISOString() }).eq('id', params.recordId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'ATTENDANCE', entityId: params.recordId, action: 'CORRECTION', performedBy: params.correctedBy, performedByName: params.correctedBy, performedByRole: params.correctedByRole, reason: params.reason, details: { oldStatus, newStatus: params.newStatus } });
+      return { success: true };
+    }
     const list = loadFromStorage<AttendanceRecord[]>(STORAGE_KEYS.ATTENDANCE_STUDENT, INITIAL_ATTENDANCE);
     const rec = list.find(a => a.id === params.recordId);
     if (!rec) return { success: false, error: 'Attendance record not found.' };
@@ -1470,7 +1679,7 @@ export const academicService = {
 
     saveToStorage(STORAGE_KEYS.ATTENDANCE_STUDENT, list);
 
-    logAudit({
+    await logAudit({
       entityType: 'ATTENDANCE',
       entityId: rec.id,
       action: 'CORRECTION',
@@ -1513,6 +1722,11 @@ export const academicService = {
   // 6. ASSESSMENTS, MARKS & MARKSHEETS
   // ------------------------------------------------------------------
   async getAssessments(): Promise<AssessmentItem[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('assessments').select('*, courses(name), batches(batch_code)').order('assessment_date', { ascending: false });
+      if (error) throw error;
+      return (data || []).map((row: any) => ({ id: row.id, title: row.title, courseId: row.course_id, courseName: row.courses?.name || '', batchId: row.batch_id || undefined, batchCode: row.batches?.batch_code || undefined, maxScore: Number(row.max_score), passingScore: Number(row.passing_score), assessmentDate: row.assessment_date, status: row.status, createdBy: row.created_by || '', approvedBy: row.approved_by || undefined, createdAt: row.created_at }));
+    }
     return loadFromStorage<AssessmentItem[]>(STORAGE_KEYS.ASSESSMENTS, INITIAL_ASSESSMENTS);
   },
 
@@ -1529,6 +1743,16 @@ export const academicService = {
   }): Promise<{ success: boolean; assessment?: AssessmentItem; error?: string }> {
     if (!params.title.trim()) return { success: false, error: 'Assessment title is required.' };
     if (params.maxScore <= 0) return { success: false, error: 'Maximum score must be greater than 0.' };
+
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) return { success: false, error: 'Sign in before creating an assessment.' };
+      const { data: staff, error: staffError } = await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).single();
+      if (staffError) return { success: false, error: staffError.message };
+      const { data, error } = await supabase.from('assessments').insert({ title: params.title.trim(), course_id: params.courseId || null, batch_id: params.batchId || null, max_score: params.maxScore, passing_score: params.passingScore, assessment_date: params.assessmentDate, status: 'draft', created_by: staff.id }).select('*, courses(name), batches(batch_code)').single();
+      if (error) return { success: false, error: error.message };
+      return { success: true, assessment: { id: data.id, title: data.title, courseId: data.course_id, courseName: data.courses?.name || params.courseName, batchId: data.batch_id || undefined, batchCode: data.batches?.batch_code || params.batchCode, maxScore: Number(data.max_score), passingScore: Number(data.passing_score), assessmentDate: data.assessment_date, status: data.status, createdBy: params.creatorName, createdAt: data.created_at } };
+    }
 
     const list = await this.getAssessments();
     const newAsm: AssessmentItem = {
@@ -1553,6 +1777,11 @@ export const academicService = {
   },
 
   async getMarksForAssessment(assessmentId: string): Promise<StudentMarkRecord[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('student_marks').select('*, student_profiles(full_name,student_id_code)').eq('assessment_id', assessmentId).order('updated_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map((row: any) => ({ id: row.id, assessmentId: row.assessment_id, studentId: row.student_id, studentIdCode: row.student_profiles?.student_id_code || '', studentName: row.student_profiles?.full_name || '', marksObtained: Number(row.marks_obtained), maxScore: Number(row.max_score), percentage: Number(row.percentage), grade: row.grade || '', remarks: row.remarks || undefined, status: row.status, enteredBy: row.entered_by || '', approvedBy: row.approved_by || undefined, updatedAt: row.updated_at }));
+    }
     const list = loadFromStorage<StudentMarkRecord[]>(STORAGE_KEYS.MARKS, INITIAL_MARKS);
     return list.filter(m => m.assessmentId === assessmentId);
   },
@@ -1578,6 +1807,25 @@ export const academicService = {
           error: `Marks for ${m.studentName} (${m.marksObtained}) exceed maximum valid score of ${params.maxScore}.`,
         };
       }
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) return { success: false, error: 'Sign in before entering marks.' };
+      const { data: staff, error: staffError } = await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).single();
+      if (staffError) return { success: false, error: staffError.message };
+      const rows = params.marksList.map(m => {
+        const percentage = Math.round((m.marksObtained / params.maxScore) * 100 * 100) / 100;
+        const grade = percentage >= 85 ? 'Distinction (A+)' : percentage >= 70 ? 'Grade A' : percentage >= 55 ? 'Grade B' : percentage >= 40 ? 'Grade C' : 'F';
+        return { assessment_id: params.assessmentId, student_id: m.studentId, marks_obtained: m.marksObtained, max_score: params.maxScore, grade, remarks: m.remarks || null, status: params.status, entered_by: staff.id, updated_at: new Date().toISOString() };
+      });
+      if (rows.length) {
+        const { error } = await supabase.from('student_marks').upsert(rows, { onConflict: 'assessment_id,student_id' });
+        if (error) return { success: false, error: error.message };
+      }
+      const { error: assessmentError } = await supabase.from('assessments').update({ status: params.status, updated_at: new Date().toISOString() }).eq('id', params.assessmentId);
+      if (assessmentError) return { success: false, error: assessmentError.message };
+      return { success: true };
     }
 
     const allMarks = loadFromStorage<StudentMarkRecord[]>(STORAGE_KEYS.MARKS, INITIAL_MARKS);
@@ -1631,6 +1879,16 @@ export const academicService = {
   },
 
   async approveAssessmentMarks(assessmentId: string, adminName: string): Promise<{ success: boolean }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData } = await supabase.auth.getUser();
+      const { data: staff } = authData.user ? await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).single() : { data: null };
+      const { error: assessmentError } = await supabase.from('assessments').update({ status: 'published', approved_by: staff?.id || null, updated_at: new Date().toISOString() }).eq('id', assessmentId);
+      if (assessmentError) throw assessmentError;
+      const { error: marksError } = await supabase.from('student_marks').update({ status: 'published', approved_by: staff?.id || null, updated_at: new Date().toISOString() }).eq('assessment_id', assessmentId);
+      if (marksError) throw marksError;
+      await logAudit({ entityType: 'MARKS', entityId: assessmentId, action: 'APPROVE', performedBy: adminName, performedByName: adminName, performedByRole: 'admin', details: {} });
+      return { success: true };
+    }
     const assessments = await this.getAssessments();
     const asm = assessments.find(a => a.id === assessmentId);
     if (asm) {
@@ -1648,7 +1906,7 @@ export const academicService = {
     });
     saveToStorage(STORAGE_KEYS.MARKS, marks);
 
-    logAudit({
+    await logAudit({
       entityType: 'MARKS',
       entityId: assessmentId,
       action: 'APPROVE',
@@ -1662,6 +1920,11 @@ export const academicService = {
   },
 
   async getStudentPublishedMarks(studentId: string): Promise<StudentMarkRecord[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('student_marks').select('*, student_profiles(full_name,student_id_code)').eq('student_id', studentId).eq('status', 'published').order('updated_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map((row: any) => ({ id: row.id, assessmentId: row.assessment_id, studentId: row.student_id, studentIdCode: row.student_profiles?.student_id_code || '', studentName: row.student_profiles?.full_name || '', marksObtained: Number(row.marks_obtained), maxScore: Number(row.max_score), percentage: Number(row.percentage), grade: row.grade || '', remarks: row.remarks || undefined, status: row.status, enteredBy: row.entered_by || '', approvedBy: row.approved_by || undefined, updatedAt: row.updated_at }));
+    }
     const list = loadFromStorage<StudentMarkRecord[]>(STORAGE_KEYS.MARKS, INITIAL_MARKS);
     return list.filter(m => m.studentId === studentId && m.status === 'published');
   },
@@ -1670,16 +1933,39 @@ export const academicService = {
   // 7. ACADEMIC DOCUMENTS & CERTIFICATES APPROVAL
   // ------------------------------------------------------------------
   async getAllDocumentsForStaff(): Promise<AcademicDocument[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('academic_documents').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(mapAcademicDocument);
+    }
     return loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
   },
 
   async getStudentDocuments(studentId: string): Promise<AcademicDocument[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('academic_documents').select('*').eq('student_id', studentId).eq('approval_status', 'approved').eq('status', 'valid').order('issue_date', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(mapAcademicDocument);
+    }
     const list = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
     // Student only receives approved documents
     return list.filter(d => d.studentId === studentId && d.approvalStatus === 'approved');
   },
 
   async getNextCertificateNumber(courseName: string): Promise<string> {
+    if (isSupabaseConfigured && supabase) {
+      const currentYear = new Date().getFullYear();
+      let courseCode = 'DCA';
+      const lower = (courseName || '').toLowerCase();
+      if (lower.includes('adca')) courseCode = 'ADCA';
+      else if (lower.includes('tally')) courseCode = 'TLY';
+      else if (lower.includes('pgdca')) courseCode = 'PGDCA';
+      else if (lower.includes('dtp')) courseCode = 'DTP';
+      const prefix = `QLI-${currentYear}-${courseCode}-`;
+      const { count, error } = await supabase.from('academic_documents').select('id', { count: 'exact', head: true }).like('certificate_number', `${prefix}%`);
+      if (error) throw error;
+      return `${prefix}${1041 + (count || 0)}`;
+    }
     const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
     const currentYear = new Date().getFullYear();
     let courseCode = 'DCA';
@@ -1726,6 +2012,48 @@ export const academicService = {
     if (params.maxScore <= 0) return { success: false, error: 'Maximum score must be greater than zero.' };
     if (params.marksObtained < 0 || params.marksObtained > params.maxScore) {
       return { success: false, error: `Marks obtained (${params.marksObtained}) must be between 0 and maximum marks (${params.maxScore}).` };
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      const marks = Math.max(0, Math.min(100, Number(params.marksObtained)));
+      const certificateNumber = (params.certificateNumber || await this.getNextCertificateNumber(params.courseName)).trim().toUpperCase();
+      let answerSheetPath: string | null = null;
+      const answerFile = params.answerSheetFile;
+      if (answerFile) {
+        if (answerFile.size > 10 * 1024 * 1024) return { success: false, error: 'Answer sheet must be 10 MB or smaller.' };
+        if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(answerFile.type)) return { success: false, error: 'Answer sheet must be a PDF, JPG, PNG, or WebP file.' };
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError || !authData.user) return { success: false, error: 'Sign in before submitting exam results.' };
+        const safeName = answerFile.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
+        answerSheetPath = `answer-sheets/${params.studentId}/${crypto.randomUUID()}_${safeName}`;
+        const { error: uploadError } = await supabase.storage.from('academic-documents').upload(answerSheetPath, answerFile, { contentType: answerFile.type, upsert: false });
+        if (uploadError) return { success: false, error: uploadError.message };
+      }
+      const { data, error } = await supabase.rpc('submit_exam_evaluation', {
+        p_student_id: params.studentId,
+        p_course_name: params.courseName.trim(),
+        p_batch_id: params.batchId || null,
+        p_batch_code: params.batchCode || null,
+        p_assessment_title: params.assessmentTitle.trim(),
+        p_exam_date: params.examDate || new Date().toISOString().slice(0, 10),
+        p_marks_obtained: marks,
+        p_remarks: params.remarks?.trim() || null,
+        p_certificate_number: certificateNumber,
+        p_issue_date: params.issueDate || new Date().toISOString().slice(0, 10),
+        p_answer_sheet_storage_path: answerSheetPath,
+        p_answer_sheet_file_name: answerFile?.name || null,
+        p_answer_sheet_mime_type: answerFile?.type || null,
+      });
+      if (error) {
+        if (answerSheetPath) await supabase.storage.from('academic-documents').remove([answerSheetPath]);
+        return { success: false, error: error.message };
+      }
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      const student = (await this.getStudentProfiles()).find(item => item.id === params.studentId);
+      const document = mapAcademicDocument(result.document);
+      const assessment: AssessmentItem = { id: result.assessment.id, title: result.assessment.title, courseId: result.assessment.course_id || student?.enrolledCourseId || '', courseName: params.courseName, batchId: result.assessment.batch_id || undefined, batchCode: params.batchCode || student?.batchCode, maxScore: Number(result.assessment.max_score), passingScore: Number(result.assessment.passing_score), assessmentDate: result.assessment.assessment_date, status: result.assessment.status, createdBy: params.submittedBy, createdAt: result.assessment.created_at };
+      const marksRecord: StudentMarkRecord = { id: result.marksRecord.id, assessmentId: result.marksRecord.assessment_id, studentId: result.marksRecord.student_id, studentIdCode: student?.studentIdCode || '', studentName: student?.fullName || '', marksObtained: Number(result.marksRecord.marks_obtained), maxScore: Number(result.marksRecord.max_score), percentage: Number(result.marksRecord.percentage), grade: result.marksRecord.grade || '', remarks: result.marksRecord.remarks || undefined, status: result.marksRecord.status, enteredBy: params.submittedBy, updatedAt: result.marksRecord.updated_at, certificateNumber };
+      return { success: true, document, assessment, marksRecord };
     }
 
     const students = await this.getStudentProfiles();
@@ -1875,7 +2203,7 @@ export const academicService = {
     saveToStorage(STORAGE_KEYS.DOCS, docs);
 
     // Audit logs
-    logAudit({
+    await logAudit({
       entityType: 'MARKS',
       entityId: asmId,
       action: 'CREATE',
@@ -1893,7 +2221,7 @@ export const academicService = {
       },
     });
 
-    logAudit({
+    await logAudit({
       entityType: 'DOCUMENT',
       entityId: docId,
       action: 'CREATE',
@@ -1939,6 +2267,42 @@ export const academicService = {
       return { success: false, error: 'Course name is required.' };
     }
 
+    if (isSupabaseConfigured && supabase) {
+      if (params.file.size > 10 * 1024 * 1024) return { success: false, error: 'File must be 10 MB or smaller.' };
+      if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(params.file.type)) return { success: false, error: 'Upload a PDF, JPG, PNG, or WebP file.' };
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) return { success: false, error: 'Sign in before uploading an academic document.' };
+      const { data: staff, error: staffError } = await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).single();
+      if (staffError) return { success: false, error: 'An active staff roster record is required to upload documents.' };
+      const students = await this.getStudentProfiles();
+      const student = students.find(s => s.id === params.studentId);
+      if (!student) return { success: false, error: 'Student not found in institute registry.' };
+      const safeName = params.file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
+      const storagePath = `${student.id}/${crypto.randomUUID()}_${safeName}`;
+      const { error: uploadError } = await supabase.storage.from('academic-documents').upload(storagePath, params.file, { contentType: params.file.type, upsert: false });
+      if (uploadError) return { success: false, error: uploadError.message };
+      const effectiveApproval: ApprovalStatus = params.isAdmin ? 'approved' : (params.approvalStatus || 'pending');
+      const now = new Date().toISOString();
+      const { data, error } = await supabase.from('academic_documents').insert({
+        student_id: student.id, document_type: params.documentType, certificate_number: cleanCertNo,
+        marksheet_number: params.documentType === 'marksheet' ? cleanCertNo : null,
+        student_id_code: student.studentIdCode, student_full_name: student.fullName,
+        course_name: params.courseName.trim(), issue_date: params.issueDate || now.slice(0, 10),
+        marks_or_grade: params.marksOrGrade?.trim() || null, file_storage_path: storagePath,
+        file_name: params.file.name, file_mime_type: params.file.type, file_size_bytes: params.file.size,
+        status: 'valid', approval_status: effectiveApproval, approved_by_staff_id: params.isAdmin ? staff.id : null,
+        approved_by_name: params.isAdmin ? params.staffName : null, approved_at: params.isAdmin ? now : null,
+        created_by: authData.user.id, created_by_name: params.staffName,
+      }).select('*').single();
+      if (error) {
+        await supabase.storage.from('academic-documents').remove([storagePath]);
+        return { success: false, error: error.message };
+      }
+      const document = mapAcademicDocument(data);
+      await logAudit({ entityType: 'DOCUMENT', entityId: document.id, action: 'CREATE', performedBy: params.staffName, performedByName: params.staffName, performedByRole: params.isAdmin ? 'admin' : 'staff', details: { certificateNumber: cleanCertNo, documentType: params.documentType, studentFullName: student.fullName, approvalStatus: effectiveApproval } });
+      return { success: true, document };
+    }
+
     const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
     if (docs.some(d => d.certificateNumber.trim().toUpperCase() === cleanCertNo)) {
       return { success: false, error: `Credential number "${cleanCertNo}" already exists in the authoritative registry.` };
@@ -1981,7 +2345,7 @@ export const academicService = {
     docs.unshift(newDoc);
     saveToStorage(STORAGE_KEYS.DOCS, docs);
 
-    logAudit({
+    await logAudit({
       entityType: 'DOCUMENT',
       entityId: newDoc.id,
       action: 'CREATE',
@@ -2000,6 +2364,27 @@ export const academicService = {
   },
 
   async approveDocument(docId: string, adminName: string): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData } = await supabase.auth.getUser();
+      const { data: staff } = authData.user ? await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).single() : { data: null };
+      const { data: doc, error: readError } = await supabase.from('academic_documents').select('assessment_id,certificate_number').eq('id', docId).single();
+      if (readError) return { success: false, error: readError.message };
+      const now = new Date().toISOString();
+      let documentUpdate = supabase.from('academic_documents').update({ approval_status: 'approved', approved_by_staff_id: staff?.id || null, approved_by_name: adminName, approved_at: now, updated_by: authData.user?.id || null, updated_at: now });
+      documentUpdate = doc.assessment_id
+        ? documentUpdate.eq('assessment_id', doc.assessment_id)
+        : documentUpdate.eq('certificate_number', doc.certificate_number);
+      const { error } = await documentUpdate;
+      if (error) return { success: false, error: error.message };
+      if (doc.assessment_id) {
+        const { error: assessmentError } = await supabase.from('assessments').update({ status: 'published', approved_by: staff?.id || null, updated_at: now }).eq('id', doc.assessment_id);
+        if (assessmentError) return { success: false, error: assessmentError.message };
+        const { error: marksError } = await supabase.from('student_marks').update({ status: 'published', approved_by: staff?.id || null, updated_at: now }).eq('assessment_id', doc.assessment_id);
+        if (marksError) return { success: false, error: marksError.message };
+      }
+      await logAudit({ entityType: 'DOCUMENT', entityId: docId, action: 'APPROVE', performedBy: adminName, performedByName: adminName, performedByRole: 'admin', details: { certificateNumber: doc.certificate_number } });
+      return { success: true };
+    }
     const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
     const doc = docs.find(d => d.id === docId);
     if (!doc) return { success: false, error: 'Document not found.' };
@@ -2035,7 +2420,7 @@ export const academicService = {
       saveToStorage(STORAGE_KEYS.MARKS, marks);
     }
 
-    logAudit({
+    await logAudit({
       entityType: 'DOCUMENT',
       entityId: doc.id,
       action: 'APPROVE',
@@ -2051,6 +2436,14 @@ export const academicService = {
   async rejectDocument(docId: string, reason: string, adminName: string): Promise<{ success: boolean; error?: string }> {
     if (!reason.trim()) return { success: false, error: 'Rejection reason is mandatory.' };
 
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData } = await supabase.auth.getUser();
+      const { error } = await supabase.from('academic_documents').update({ approval_status: 'rejected', rejection_reason: reason.trim(), updated_by: authData.user?.id || null, updated_at: new Date().toISOString() }).eq('id', docId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'DOCUMENT', entityId: docId, action: 'REJECT', performedBy: adminName, performedByName: adminName, performedByRole: 'admin', reason, details: {} });
+      return { success: true };
+    }
+
     const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
     const doc = docs.find(d => d.id === docId);
     if (!doc) return { success: false, error: 'Document not found.' };
@@ -2061,7 +2454,7 @@ export const academicService = {
     doc.updatedBy = adminName;
     saveToStorage(STORAGE_KEYS.DOCS, docs);
 
-    logAudit({
+    await logAudit({
       entityType: 'DOCUMENT',
       entityId: doc.id,
       action: 'REJECT',
@@ -2078,6 +2471,14 @@ export const academicService = {
   async revokeDocument(docId: string, reason: string, adminName: string): Promise<{ success: boolean; error?: string }> {
     if (!reason.trim()) return { success: false, error: 'A clear revocation reason must be entered.' };
 
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData } = await supabase.auth.getUser();
+      const { error } = await supabase.from('academic_documents').update({ status: 'revoked', revocation_reason: reason.trim(), revoked_at: new Date().toISOString(), revoked_by: authData.user?.id || null, updated_by: authData.user?.id || null, updated_at: new Date().toISOString() }).eq('id', docId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'DOCUMENT', entityId: docId, action: 'REVOKE', performedBy: adminName, performedByName: adminName, performedByRole: 'admin', reason, details: {} });
+      return { success: true };
+    }
+
     const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
     const doc = docs.find(d => d.id === docId);
     if (!doc) return { success: false, error: 'Document not found.' };
@@ -2090,7 +2491,7 @@ export const academicService = {
     doc.updatedBy = adminName;
     saveToStorage(STORAGE_KEYS.DOCS, docs);
 
-    logAudit({
+    await logAudit({
       entityType: 'DOCUMENT',
       entityId: doc.id,
       action: 'REVOKE',
@@ -2105,6 +2506,13 @@ export const academicService = {
   },
 
   async restoreDocument(docId: string, adminName: string): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData } = await supabase.auth.getUser();
+      const { error } = await supabase.from('academic_documents').update({ status: 'valid', revocation_reason: null, revoked_at: null, revoked_by: null, updated_by: authData.user?.id || null, updated_at: new Date().toISOString() }).eq('id', docId);
+      if (error) return { success: false, error: error.message };
+      await logAudit({ entityType: 'DOCUMENT', entityId: docId, action: 'RESTORE', performedBy: adminName, performedByName: adminName, performedByRole: 'admin', details: {} });
+      return { success: true };
+    }
     const docs = loadFromStorage<AcademicDocument[]>(STORAGE_KEYS.DOCS, INITIAL_DOCUMENTS);
     const doc = docs.find(d => d.id === docId);
     if (!doc) return { success: false, error: 'Document not found.' };
@@ -2117,7 +2525,7 @@ export const academicService = {
     doc.updatedBy = adminName;
     saveToStorage(STORAGE_KEYS.DOCS, docs);
 
-    logAudit({
+    await logAudit({
       entityType: 'DOCUMENT',
       entityId: doc.id,
       action: 'RESTORE',
@@ -2131,6 +2539,16 @@ export const academicService = {
   },
 
   async getSecureDocumentUrl(doc: AcademicDocument): Promise<string> {
+    if (isSupabaseConfigured && supabase && doc.isPortalGenerated) {
+      const svg = doc.documentType === 'marksheet' ? generateOfficialMarksheetSvg(doc) : generateOfficialCertificateSvg(doc);
+      return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    }
+    if (isSupabaseConfigured && supabase) {
+      if (!doc.fileStoragePath) throw new Error('This document has no stored file.');
+      const { data, error } = await supabase.storage.from('academic-documents').createSignedUrl(doc.fileStoragePath, 300);
+      if (error) throw error;
+      return data.signedUrl;
+    }
     if (doc.isPortalGenerated || doc.documentType === 'certificate' || !doc.localFileData) {
       const previewSvg = generateOfficialCertificateSvg(doc);
       const blob = new Blob([previewSvg], { type: 'image/svg+xml' });
@@ -2140,6 +2558,11 @@ export const academicService = {
   },
 
   async getSecureAnswerSheetUrl(doc: AcademicDocument): Promise<string | null> {
+    if (isSupabaseConfigured && supabase && doc.answerSheetStoragePath) {
+      const { data, error } = await supabase.storage.from('academic-documents').createSignedUrl(doc.answerSheetStoragePath, 300);
+      if (error) throw error;
+      return data.signedUrl;
+    }
     if (doc.examAnswerSheetFileData) {
       return doc.examAnswerSheetFileData;
     }
@@ -2150,12 +2573,37 @@ export const academicService = {
   // 8. LEARNING MATERIALS & SYLLABUS
   // ------------------------------------------------------------------
   async getLearningMaterials(courseId?: string): Promise<LearningResourceItem[]> {
+    if (isSupabaseConfigured && supabase) {
+      let query = supabase.from('learning_materials').select('*, courses(name), batches(batch_code)').order('created_at', { ascending: false });
+      if (courseId) query = query.eq('course_id', courseId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return Promise.all((data || []).map(async (row: any) => {
+        let fileUrl = row.file_url || '';
+        if (fileUrl && !/^https?:\/\//i.test(fileUrl)) {
+          const { data: signed, error: urlError } = await supabase.storage.from('academic-documents').createSignedUrl(fileUrl, 300);
+          if (!urlError && signed) fileUrl = signed.signedUrl;
+        }
+        return { id: row.id, title: row.title, courseId: row.course_id || '', courseName: row.courses?.name || '', batchCode: row.batches?.batch_code || undefined, category: row.category, subject: row.subject, fileUrl, fileName: row.file_name, fileSize: row.file_size_bytes ? `${Math.ceil(row.file_size_bytes / 1024)} KB` : '', isPublished: row.is_published !== false, uploadedBy: row.uploaded_by || '', uploadedAt: row.created_at };
+      }));
+    }
     const list = loadFromStorage<LearningResourceItem[]>(STORAGE_KEYS.LEARNING, INITIAL_LEARNING_MATERIALS);
     if (!courseId) return list;
     return list.filter(m => m.courseId === courseId);
   },
 
   async createLearningMaterial(item: Omit<LearningResourceItem, 'id' | 'uploadedAt'>, operatorName: string): Promise<LearningResourceItem> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) throw new Error('Sign in before creating learning materials.');
+      const { data: staff, error: staffError } = await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).single();
+      if (staffError) throw staffError;
+      const { data, error } = await supabase.from('learning_materials').insert({ course_id: item.courseId || null, title: item.title, subject: item.subject, category: item.category, file_url: item.fileUrl, file_name: item.fileName, file_size_bytes: Number.parseInt(item.fileSize, 10) || 0, is_published: item.isPublished, uploaded_by: staff.id }).select('*, courses(name), batches(batch_code)').single();
+      if (error) throw error;
+      const created: LearningResourceItem = { id: data.id, title: data.title, courseId: data.course_id || '', courseName: data.courses?.name || item.courseName, batchCode: data.batches?.batch_code || item.batchCode, category: data.category, subject: data.subject, fileUrl: data.file_url, fileName: data.file_name, fileSize: item.fileSize, isPublished: data.is_published, uploadedBy: operatorName, uploadedAt: data.created_at };
+      await logAudit({ entityType: 'SYLLABUS', entityId: created.id, action: 'CREATE', performedBy: operatorName, performedByName: operatorName, performedByRole: 'staff', details: { title: created.title, courseName: created.courseName } });
+      return created;
+    }
     const list = await this.getLearningMaterials();
     const newMat: LearningResourceItem = {
       ...item,
@@ -2165,7 +2613,7 @@ export const academicService = {
     list.unshift(newMat);
     saveToStorage(STORAGE_KEYS.LEARNING, list);
 
-    logAudit({
+    await logAudit({
       entityType: 'SYLLABUS',
       entityId: newMat.id,
       action: 'CREATE',
@@ -2179,6 +2627,14 @@ export const academicService = {
   },
 
   async toggleMaterialPublish(materialId: string, operatorName: string): Promise<{ success: boolean }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: current, error: readError } = await supabase.from('learning_materials').select('is_published,title').eq('id', materialId).single();
+      if (readError) throw readError;
+      const { error } = await supabase.from('learning_materials').update({ is_published: !current.is_published, updated_at: new Date().toISOString() }).eq('id', materialId);
+      if (error) throw error;
+      await logAudit({ entityType: 'SYLLABUS', entityId: materialId, action: 'UPDATE', performedBy: operatorName, performedByName: operatorName, performedByRole: 'staff', details: { title: current.title, isPublished: !current.is_published } });
+      return { success: true };
+    }
     const list = await this.getLearningMaterials();
     const mat = list.find(m => m.id === materialId);
     if (mat) {
@@ -2192,12 +2648,52 @@ export const academicService = {
   // 9. MOCK TESTS & GOVERNMENT EXAM PREPARATION
   // ------------------------------------------------------------------
   async getMockTests(category?: ExamCategory): Promise<MockTestItem[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: role, error: roleError } = await supabase.rpc('get_auth_role');
+      if (roleError) throw roleError;
+      if (role === 'admin' || role === 'staff') {
+        let query = supabase.from('mock_tests').select('*, mock_questions(*)').order('created_at', { ascending: false });
+        if (category) query = query.eq('category', category);
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data || []).map((row: any) => ({ id: row.id, title: row.title, category: row.category, targetExam: row.target_exam || undefined, durationMinutes: row.duration_minutes, totalQuestions: row.mock_questions?.length || 0, totalMarks: row.total_marks, passingPercentage: Number(row.passing_percentage), instructions: row.instructions || '', isPublished: row.is_published, questions: (row.mock_questions || []).sort((a: any, b: any) => a.question_order - b.question_order).map((q: any) => ({ id: q.id, questionText: q.question_text, questionTextAs: q.question_text_as || undefined, options: q.options || [], correctOptionIndex: q.correct_option_index, explanation: q.explanation || undefined, marks: q.marks })) }));
+      }
+      const { data, error } = await supabase.rpc('get_published_mock_tests', {
+        p_category: category || null,
+      });
+      if (error) {
+        console.error('Could not load published mock tests:', error);
+        return [];
+      }
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      return Array.isArray(result) ? result as MockTestItem[] : [];
+    }
+
+    if (!LOCAL_PREVIEW_ENABLED) return [];
     const list = loadFromStorage<MockTestItem[]>(STORAGE_KEYS.MOCK_TESTS, INITIAL_MOCK_TESTS);
     if (!category) return list;
     return list.filter(t => t.category === category);
   },
 
   async createMockTest(test: Omit<MockTestItem, 'id'>, operatorName: string): Promise<MockTestItem> {
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) throw new Error('Sign in before creating a mock test.');
+      const { data: staff, error: staffError } = await supabase.from('institute_staff').select('id').eq('user_id', authData.user.id).single();
+      if (staffError) throw staffError;
+      const { data: createdRow, error } = await supabase.from('mock_tests').insert({ title: test.title, category: test.category, target_exam: test.targetExam || null, duration_minutes: test.durationMinutes, total_marks: test.totalMarks, passing_percentage: test.passingPercentage, instructions: test.instructions, is_published: test.isPublished, created_by: staff.id }).select('*').single();
+      if (error) throw error;
+      const questionRows = test.questions.map((question, index) => ({ test_id: createdRow.id, question_order: index + 1, question_text: question.questionText, question_text_as: question.questionTextAs || null, options: question.options, correct_option_index: question.correctOptionIndex ?? 0, explanation: question.explanation || null, marks: question.marks }));
+      if (questionRows.length) {
+        const { error: questionError } = await supabase.from('mock_questions').insert(questionRows);
+        if (questionError) {
+          await supabase.from('mock_tests').delete().eq('id', createdRow.id);
+          throw questionError;
+        }
+      }
+      await logAudit({ entityType: 'TEST', entityId: createdRow.id, action: 'CREATE', performedBy: operatorName, performedByName: operatorName, performedByRole: 'staff', details: { title: createdRow.title, category: createdRow.category } });
+      return { ...test, id: createdRow.id };
+    }
     const list = await this.getMockTests();
     const newTest: MockTestItem = {
       ...test,
@@ -2205,7 +2701,7 @@ export const academicService = {
     };
     list.unshift(newTest);
     saveToStorage(STORAGE_KEYS.MOCK_TESTS, list);
-    logAudit({
+    await logAudit({
       entityType: 'TEST',
       entityId: newTest.id,
       action: 'CREATE',
@@ -2224,8 +2720,26 @@ export const academicService = {
     startedAt: string;
     userAnswers: Record<string, number>;
   }): Promise<{ attempt: MockTestAttempt; test: MockTestItem }> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.rpc('submit_mock_test_attempt', {
+        p_test_id: params.testId,
+        p_answers: params.userAnswers,
+      });
+      if (error) throw new Error(`Mock test submission failed: ${error.message}`);
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      if (!result?.attempt || !result?.test) {
+        throw new Error('The server returned an invalid mock test result.');
+      }
+      return result as { attempt: MockTestAttempt; test: MockTestItem };
+    }
+
+    if (!LOCAL_PREVIEW_ENABLED) {
+      throw new Error('Mock test submissions require secure Supabase authentication.');
+    }
+
     const tests = await this.getMockTests();
-    const test = tests.find(t => t.id === params.testId) || INITIAL_MOCK_TESTS[0];
+    const test = tests.find(t => t.id === params.testId);
+    if (!test) throw new Error('Mock test not found.');
 
     // Compute authoritatively on server/service logic (answers were concealed from student)
     let score = 0;
@@ -2262,22 +2776,72 @@ export const academicService = {
   },
 
   async getStudentAttempts(studentId: string): Promise<MockTestAttempt[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('mock_test_attempts')
+        .select('id, test_id, student_id, started_at, completed_at, user_answers, score_obtained, total_marks, percentage, passed, mock_tests(title), student_profiles(full_name)')
+        .eq('student_id', studentId)
+        .order('completed_at', { ascending: false });
+      if (error) {
+        console.error('Could not load mock test attempts:', error);
+        return [];
+      }
+      return (data || []).map((row: any) => {
+        const test = Array.isArray(row.mock_tests) ? row.mock_tests[0] : row.mock_tests;
+        const student = Array.isArray(row.student_profiles) ? row.student_profiles[0] : row.student_profiles;
+        return {
+          id: row.id,
+          testId: row.test_id,
+          testTitle: test?.title || 'Mock Test',
+          studentId: row.student_id,
+          studentName: student?.full_name || '',
+          startedAt: row.started_at,
+          completedAt: row.completed_at,
+          userAnswers: row.user_answers || {},
+          scoreObtained: Number(row.score_obtained),
+          totalMarks: Number(row.total_marks),
+          percentage: Number(row.percentage),
+          passed: Boolean(row.passed),
+        };
+      });
+    }
+
+    if (!LOCAL_PREVIEW_ENABLED) return [];
     const attempts = loadFromStorage<MockTestAttempt[]>(STORAGE_KEYS.MOCK_ATTEMPTS, []);
     return attempts.filter(a => a.studentId === studentId);
   },
 
   async getGovtExamPapers(): Promise<GovtExamPaperItem[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('govt_exam_papers').select('*').order('year', { ascending: false });
+      if (error) throw error;
+      return (data || []).map((row: any) => ({ id: row.id, examName: row.exam_name, year: row.year, subject: row.subject, language: row.language, difficulty: row.difficulty, downloadUrl: row.file_url, fileSize: row.file_size || '', isOfficialPaper: row.is_official_paper === true, disclaimer: row.disclaimer || '' }));
+    }
     return loadFromStorage<GovtExamPaperItem[]>(STORAGE_KEYS.GOVT_PAPERS, INITIAL_GOVT_PAPERS);
   },
 
   // ------------------------------------------------------------------
   // 10. AUDIT LOGS & BACKUP EXPORTS
   // ------------------------------------------------------------------
-  getAuditLogs(): AcademicAuditLog[] {
+  async getAuditLogs(): Promise<AcademicAuditLog[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('academic_audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
+      if (error) throw error;
+      return (data || []).map((row: any) => ({ id: row.id, entityType: row.entity_type, entityId: row.entity_id, action: row.action, performedBy: row.performed_by_id || '', performedByName: row.performed_by_name || '', performedByRole: row.performed_by_role || '', reason: row.reason || undefined, details: row.details || {}, createdAt: row.created_at }));
+    }
     return loadFromStorage<AcademicAuditLog[]>(STORAGE_KEYS.AUDIT, []);
   },
 
-  exportFullBackupJson(): string {
+  async exportFullBackupJson(): Promise<string> {
+    if (isSupabaseConfigured && supabase) {
+      const [courses, batches, staff, students, documents, attendance, assessments, learningMaterials, mockTests, auditLogs, marks] = await Promise.all([
+        this.getCourses(), this.getBatches(), this.getStaffMembers(), this.getStudentProfiles(),
+        this.getAllDocumentsForStaff(), this.getAllAttendance(), this.getAssessments(),
+        this.getLearningMaterials(), this.getMockTests(), this.getAuditLogs(),
+        supabase.from('student_marks').select('*').then(({ data, error }) => { if (error) throw error; return data || []; }),
+      ]);
+      return JSON.stringify({ timestamp: new Date().toISOString(), institution: 'Quantum Learning Institute / Taxcent Connect', version: '2.0.0', data: { courses, batches, staff, students, documents, attendance, assessments, marks, learningMaterials, mockTests, auditLogs } }, null, 2);
+    }
     const fullBackup = {
       timestamp: new Date().toISOString(),
       institution: 'Quantum Learning Institute / Taxcent Connect',
@@ -2303,6 +2867,50 @@ export const academicService = {
 // ------------------------------------------------------------------
 // Internal helper functions
 // ------------------------------------------------------------------
+function mapAcademicDocument(row: any): AcademicDocument {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    documentType: row.document_type,
+    certificateNumber: row.certificate_number,
+    marksheetNumber: row.marksheet_number || undefined,
+    studentIdCode: row.student_id_code,
+    studentFullName: row.student_full_name,
+    courseName: row.course_name,
+    issueDate: row.issue_date,
+    marksOrGrade: row.marks_or_grade || undefined,
+    fileStoragePath: row.file_storage_path,
+    fileName: row.file_name || row.certificate_number,
+    fileMimeType: row.file_mime_type || 'application/pdf',
+    fileSizeBytes: Number(row.file_size_bytes || 0),
+    status: row.status,
+    approvalStatus: row.approval_status,
+    approvedBy: row.approved_by_name || undefined,
+    approvedAt: row.approved_at || undefined,
+    rejectionReason: row.rejection_reason || undefined,
+    revocationReason: row.revocation_reason || undefined,
+    revokedAt: row.revoked_at || undefined,
+    revokedBy: row.revoked_by || undefined,
+    createdBy: row.created_by || '',
+    createdByName: row.created_by_name || undefined,
+    updatedBy: row.updated_by || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    isPortalGenerated: row.is_portal_generated === true,
+    assessmentId: row.assessment_id || undefined,
+    assessmentTitle: row.assessment_title || undefined,
+    marksObtained: row.marks_obtained == null ? undefined : Number(row.marks_obtained),
+    maxScore: row.max_score == null ? undefined : Number(row.max_score),
+    percentage: row.percentage == null ? undefined : Number(row.percentage),
+    grade: row.grade || undefined,
+    evaluatorRemarks: row.evaluator_remarks || undefined,
+    batchCode: row.batch_code || undefined,
+    courseDurationMonths: row.course_duration_months || undefined,
+    examAnswerSheetFileName: row.answer_sheet_file_name || undefined,
+    examAnswerSheetMimeType: row.answer_sheet_mime_type || undefined,
+  };
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

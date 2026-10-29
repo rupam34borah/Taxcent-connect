@@ -100,14 +100,15 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
       const roster = await academicService.getStudentProfiles();
       setStudents(roster);
 
-      let targetStudent = roster[0];
+      let targetStudent: StudentProfile | undefined;
       if (role === 'student' && user) {
-        const match = roster.find(
+        targetStudent = roster.find(
           s => s.id === user.studentId || 
                s.studentIdCode === user.studentIdCode ||
                s.email.toLowerCase() === user.email.toLowerCase()
         );
-        if (match) targetStudent = match;
+      } else if (role === 'admin') {
+        targetStudent = roster.find(s => s.id === activeStudentId) || roster[0];
       }
 
       if (targetStudent) {
@@ -116,6 +117,12 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
         setEditPhone(targetStudent.phone);
         setEditEmail(targetStudent.email);
         await loadStudentRecords(targetStudent.id);
+      } else {
+        setActiveStudentId('');
+        setCurrentStudent(null);
+        setDocuments([]);
+        setPublishedMarks([]);
+        setTestAttempts([]);
       }
 
       const [allCourses, allMaterials, allTests, allGovt] = await Promise.all([
@@ -269,14 +276,14 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                {currentStudent?.studentIdCode || user?.studentIdCode || 'QLI-STU-2026-001'}
+                {currentStudent?.studentIdCode || user?.studentIdCode || 'Profile not linked'}
               </span>
               <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
                 Active Enrolment
               </span>
             </div>
             <h2 className="text-xl font-extrabold text-white mt-1">
-              {currentStudent?.fullName || user?.name || 'Rahul Sharma'}
+              {currentStudent?.fullName || user?.name || 'Student'}
             </h2>
             <p className="text-xs text-slate-400">
               {currentStudent?.enrolledCourse} &bull; Batch: {currentStudent?.batchCode || 'DCA-2026-M1'}
@@ -826,7 +833,8 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
                 <h4 className="text-sm font-bold text-white">Answer Key & Detailed Explanations</h4>
                 {testCompletedResult.test.questions.map((q, idx) => {
                   const studentChoice = testCompletedResult.attempt.userAnswers[q.id];
-                  const isCorrect = studentChoice === q.correctOptionIndex;
+                  const correctOptionIndex = q.correctOptionIndex;
+                  const isCorrect = correctOptionIndex !== undefined && studentChoice === correctOptionIndex;
                   return (
                     <div key={q.id} className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2 text-xs">
                       <div className="flex items-start justify-between gap-2">
@@ -836,13 +844,13 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
                           isCorrect ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
                         }`}>
-                          {isCorrect ? 'Correct (+5)' : 'Incorrect (0)'}
+                          {isCorrect ? 'Correct' : 'Incorrect'}
                         </span>
                       </div>
 
                       <div className="text-slate-400 text-[11px]">
-                        Correct Answer: <span className="font-bold text-emerald-400">{q.options[q.correctOptionIndex]}</span>
-                        {studentChoice !== undefined && studentChoice !== q.correctOptionIndex && (
+                        Correct Answer: <span className="font-bold text-emerald-400">{correctOptionIndex === undefined ? 'Unavailable' : q.options[correctOptionIndex]}</span>
+                        {studentChoice !== undefined && correctOptionIndex !== undefined && studentChoice !== correctOptionIndex && (
                           <span className="text-rose-400 ml-2">(You chose: {q.options[studentChoice]})</span>
                         )}
                       </div>

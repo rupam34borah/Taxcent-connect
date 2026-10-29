@@ -201,7 +201,7 @@ export interface MockQuestionItem {
   questionText: string;
   questionTextAs?: string;
   options: string[];
-  correctOptionIndex: number; // Hidden from student until test submission
+  correctOptionIndex?: number; // Returned only after server-side submission
   explanation?: string;
   marks: number;
 }

@@ -32,9 +32,21 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
+
+      - name: Check production Supabase configuration
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$VITE_SUPABASE_URL" || { echo "Set the VITE_SUPABASE_URL repository variable before deploying."; exit 1; }
+          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "Set the VITE_SUPABASE_ANON_KEY repository secret before deploying."; exit 1; }
 
       - name: Build Production Website
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Setup GitHub Pages
