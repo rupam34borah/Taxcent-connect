@@ -19,6 +19,7 @@ import {
   ExamCategory
 } from '../types/academic';
 import { academicService } from '../services/academicService';
+import { credentialStore } from '../services/credentialStore';
 import { useAuth } from '../context/AuthContext';
 import { downloadAcademicDocumentPdf, printAcademicDocument } from '../utils/certificateGenerator';
 import { 
@@ -114,6 +115,15 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
   const [inviteModalTitle, setInviteModalTitle] = useState('');
   const [inviteModalEmail, setInviteModalEmail] = useState('');
   const [copiedType, setCopiedType] = useState<'link' | 'password' | null>(null);
+
+  // Self Password Change modal states (for logged-in staff and admin)
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [passwordModalCurrent, setPasswordModalCurrent] = useState('');
+  const [passwordModalNew, setPasswordModalNew] = useState('');
+  const [passwordModalConfirm, setPasswordModalConfirm] = useState('');
+  const [passwordModalLoading, setPasswordModalLoading] = useState(false);
+  const [passwordModalError, setPasswordModalError] = useState('');
+  const [passwordModalSuccess, setPasswordModalSuccess] = useState(false);
 
   // Selected item references for actions
   const [selectedAttendance, setSelectedAttendance] = useState<AttendanceRecord | null>(null);
@@ -278,8 +288,8 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
 
       setInviteModalTitle(res.message || `Staff Member Created: ${res.staff.fullName}`);
       setInviteModalEmail(res.staff.email);
-      setGeneratedInviteLink(res.inviteLink || '');
-      setGeneratedTempPassword(res.tempPassword || '');
+      setGeneratedInviteLink('');
+      setGeneratedTempPassword(res.tempPassword || '123456');
       setCopiedType(null);
       setIsInviteLinkModalOpen(true);
     } else {
@@ -299,41 +309,70 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
     }
   };
 
-  const handleResendStaffInvite = async (stf: StaffMember) => {
-    const res = await academicService.resendInvitationLink({
-      email: stf.email,
-      fullName: stf.fullName,
-      kind: 'staff',
-      operatorName,
-    });
-    if (res.success && res.inviteLink) {
-      setInviteModalTitle(res.message || `Access & Invitation Link for ${stf.fullName} (${stf.email})`);
-      setInviteModalEmail(stf.email);
-      setGeneratedInviteLink(res.inviteLink);
-      setGeneratedTempPassword('');
-      setCopiedType(null);
-      setIsInviteLinkModalOpen(true);
-    } else {
-      alert(res.error || 'Failed to resend invite link.');
-    }
+  const handleResendStaffInvite = (stf: StaffMember) => {
+    setInviteModalTitle(`Staff Account Details: ${stf.fullName}`);
+    setInviteModalEmail(stf.email);
+    setGeneratedTempPassword(credentialStore.getDefaultPassword());
+    setGeneratedInviteLink('');
+    setCopiedType(null);
+    setIsInviteLinkModalOpen(true);
   };
 
-  const handleResendStudentInvite = async (stu: StudentProfile) => {
-    const res = await academicService.resendInvitationLink({
-      email: stu.email,
-      fullName: stu.fullName,
-      kind: 'student',
-      operatorName,
-    });
-    if (res.success && res.inviteLink) {
-      setInviteModalTitle(res.message || `Access & Invitation Link for ${stu.fullName} (${stu.email})`);
-      setInviteModalEmail(stu.email);
-      setGeneratedInviteLink(res.inviteLink);
-      setGeneratedTempPassword('');
-      setCopiedType(null);
-      setIsInviteLinkModalOpen(true);
-    } else {
-      alert(res.error || 'Failed to resend invite link.');
+  const handleResendStudentInvite = (stu: StudentProfile) => {
+    setInviteModalTitle(`Student Account Details: ${stu.fullName} (${stu.studentIdCode})`);
+    setInviteModalEmail(stu.email);
+    setGeneratedTempPassword(credentialStore.getDefaultPassword());
+    setGeneratedInviteLink('');
+    setCopiedType(null);
+    setIsInviteLinkModalOpen(true);
+  };
+
+  const handleSelfPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordModalError('');
+    setPasswordModalSuccess(false);
+
+    if (!user?.email) {
+      setPasswordModalError('No user email associated with this session.');
+      return;
+    }
+
+    if (passwordModalNew.length < 6) {
+      setPasswordModalError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (passwordModalNew !== passwordModalConfirm) {
+      setPasswordModalError('New passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setPasswordModalLoading(true);
+    try {
+      const res = await academicService.changeAccountPassword({
+        email: user.email,
+        currentPassword: passwordModalCurrent,
+        newPassword: passwordModalNew,
+        userRole: role || 'staff',
+        userName: user.name || 'Staff Member',
+      });
+
+      if (res.success) {
+        setPasswordModalSuccess(true);
+        setPasswordModalCurrent('');
+        setPasswordModalNew('');
+        setPasswordModalConfirm('');
+        setTimeout(() => {
+          setIsChangePasswordModalOpen(false);
+          setPasswordModalSuccess(false);
+        }, 3000);
+      } else {
+        setPasswordModalError(res.error || 'Failed to update password.');
+      }
+    } catch (err: unknown) {
+      setPasswordModalError(err instanceof Error ? err.message : 'An error occurred.');
+    } finally {
+      setPasswordModalLoading(false);
     }
   };
 
@@ -371,8 +410,8 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
 
       setInviteModalTitle(res.message || `Student Enrolled: ${res.student.fullName} (${res.student.studentIdCode})`);
       setInviteModalEmail(res.student.email);
-      setGeneratedInviteLink(res.inviteLink || '');
-      setGeneratedTempPassword(res.tempPassword || '');
+      setGeneratedInviteLink('');
+      setGeneratedTempPassword(res.tempPassword || '123456');
       setCopiedType(null);
       setIsInviteLinkModalOpen(true);
     } else {
@@ -870,6 +909,22 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-sky-400' : ''}`} />
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPasswordModalCurrent('');
+              setPasswordModalNew('');
+              setPasswordModalConfirm('');
+              setPasswordModalError('');
+              setPasswordModalSuccess(false);
+              setIsChangePasswordModalOpen(true);
+            }}
+            title="Change Your Account Password"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Change Password</span>
+          </button>
           {isAdmin && (
             <button
               type="button"
@@ -1165,10 +1220,10 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                             type="button"
                             onClick={() => handleResendStaffInvite(stf)}
                             className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 border border-sky-500/30 cursor-pointer transition-colors flex items-center gap-1"
-                            title="Resend invitation and password setup link"
+                            title="View staff login credentials and default password"
                           >
-                            <Send className="w-3 h-3" />
-                            <span>Resend Link</span>
+                            <KeyRound className="w-3 h-3 text-amber-400" />
+                            <span>Login Info</span>
                           </button>
                           <button
                             type="button"
@@ -1283,10 +1338,10 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                               type="button"
                               onClick={() => handleResendStudentInvite(stu)}
                               className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1"
-                              title="Resend student portal access / login setup link"
+                              title="View student login credentials and default password"
                             >
-                              <Send className="w-3 h-3" />
-                              <span>Resend Link</span>
+                              <KeyRound className="w-3 h-3 text-amber-400" />
+                              <span>Login Info</span>
                             </button>
                             <button
                               type="button"
@@ -2237,9 +2292,9 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
         </div>
       )}
 
-      {/* Modal 3: Invite Link & Credentials Display */}
+      {/* Modal 3: Account Credentials & Default Password Display */}
       {isInviteLinkModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
@@ -2247,8 +2302,8 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Credentials & Access Ready</h3>
-                  <p className="text-[11px] text-emerald-400 font-medium">Automatic verification & setup email dispatched</p>
+                  <h3 className="text-base font-bold text-white">Account Created & Ready</h3>
+                  <p className="text-[11px] text-emerald-400 font-medium">Default initial password is set to 123456</p>
                 </div>
               </div>
               <button
@@ -2260,19 +2315,18 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
               </button>
             </div>
 
-            <div className="bg-sky-950/30 border border-sky-800/40 rounded-2xl p-3.5 space-y-1">
-              <div className="flex items-center gap-2 text-xs font-semibold text-sky-300">
-                <Mail className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>Verification Email Dispatched</span>
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Registered Account Email
+                </span>
+                <div className="font-mono text-sm text-sky-400 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 select-all font-semibold">
+                  {inviteModalEmail}
+                </div>
               </div>
-              <p className="text-xs text-slate-300 pl-6">
-                An official setup link has been sent to <strong className="text-white font-mono">{inviteModalEmail}</strong>. The recipient can click the link in their inbox to verify their account and create their confidential password.
-              </p>
-            </div>
 
-            {generatedTempPassword && (
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-1">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <KeyRound className="w-3.5 h-3.5 text-amber-400" />
                     Default Initial Password
@@ -2280,7 +2334,7 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(generatedTempPassword);
+                      navigator.clipboard.writeText(generatedTempPassword || '123456');
                       setCopiedType('password');
                       setTimeout(() => setCopiedType(null), 2500);
                     }}
@@ -2290,40 +2344,20 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                     <span>{copiedType === 'password' ? 'Copied!' : 'Copy Password'}</span>
                   </button>
                 </div>
-                <div className="font-mono text-sm text-amber-300 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 select-all tracking-wider font-semibold">
-                  {generatedTempPassword}
+                <div className="font-mono text-base text-amber-300 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 select-all tracking-widest font-bold">
+                  {generatedTempPassword || '123456'}
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Recipient can also sign in right away with this default password and will be prompted to change it.
-                </p>
               </div>
-            )}
+            </div>
 
-            {generatedInviteLink && (
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Send className="w-3.5 h-3.5 text-sky-400" />
-                    Direct Portal Access Link
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedInviteLink);
-                      setCopiedType('link');
-                      setTimeout(() => setCopiedType(null), 2500);
-                    }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-bold transition-colors cursor-pointer"
-                  >
-                    {copiedType === 'link' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedType === 'link' ? 'Copied!' : 'Copy Link'}</span>
-                  </button>
-                </div>
-                <div className="font-mono text-xs text-sky-400 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 select-all break-all max-h-20 overflow-y-auto">
-                  {generatedInviteLink}
-                </div>
-              </div>
-            )}
+            <div className="bg-sky-950/30 border border-sky-800/40 rounded-2xl p-3.5 space-y-1.5 text-xs">
+              <p className="text-slate-300">
+                The user can sign in immediately using their email and default password <strong className="text-amber-300 font-mono">123456</strong>.
+              </p>
+              <p className="text-slate-400 text-[11px]">
+                After signing in, they can update their password to a private password directly from their portal dashboard.
+              </p>
+            </div>
 
             <div className="pt-2 flex justify-end">
               <button
@@ -2334,6 +2368,106 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Staff & Admin Change Password Modal */}
+      {isChangePasswordModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">Change Account Password</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChangePasswordModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Update your confidential portal access password for <strong className="text-white font-mono">{user?.email}</strong>.
+            </p>
+
+            {passwordModalSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Password successfully updated! Use your new password for all future sign-ins.</span>
+              </div>
+            )}
+
+            {passwordModalError && (
+              <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{passwordModalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSelfPasswordChange} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Current Password (or 123456 if newly created)
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={passwordModalCurrent}
+                  onChange={e => setPasswordModalCurrent(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  New Password (min 6 characters)
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter new password"
+                  value={passwordModalNew}
+                  onChange={e => setPasswordModalNew(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Re-enter new password"
+                  value={passwordModalConfirm}
+                  onChange={e => setPasswordModalConfirm(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsChangePasswordModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordModalLoading}
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {passwordModalLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

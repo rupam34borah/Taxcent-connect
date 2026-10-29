@@ -22,6 +22,7 @@ import {
 } from '../types/academic';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { credentialStore, DEFAULT_INITIAL_PASSWORD } from './credentialStore';
 
 function getEphemeralAuthClient() {
   const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
@@ -1203,10 +1204,13 @@ export const academicService = {
     assignedCourses: string[];
     assignedBatches: string[];
     adminName: string;
-  }): Promise<{ success: boolean; staff?: StaffMember; error?: string; inviteLink?: string; tempPassword?: string; message?: string }> {
+  }): Promise<{ success: boolean; staff?: StaffMember; error?: string; tempPassword?: string; message?: string }> {
     const email = params.email.trim().toLowerCase();
     const currentYear = new Date().getFullYear();
-    const tempPassword = `Taxcent#${Math.random().toString(36).slice(2, 6).toUpperCase()}!${Math.floor(100 + Math.random() * 900)}`;
+    const tempPassword = DEFAULT_INITIAL_PASSWORD;
+
+    // Register initial default password (123456) in credential store
+    credentialStore.setPassword(email, tempPassword);
 
     if (isSupabaseConfigured && supabase) {
       const staffIdCode = `QLI-STF-${currentYear}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -1214,11 +1218,9 @@ export const academicService = {
       // Step 1: Create auth user with ephemeral client to avoid disrupting current admin session
       const ephemeral = getEphemeralAuthClient();
       let authUserId: string | null = null;
-      let emailDispatched = false;
 
       if (ephemeral) {
         try {
-          const siteUrl = window.location.origin + window.location.pathname;
           const { data: authData } = await ephemeral.auth.signUp({
             email,
             password: tempPassword,
@@ -1227,32 +1229,17 @@ export const academicService = {
                 full_name: params.fullName.trim(),
                 role: params.role,
               },
-              emailRedirectTo: `${siteUrl}#academic`,
             },
           });
           if (authData?.user?.id) {
             authUserId = authData.user.id;
-            emailDispatched = true;
           }
         } catch (authErr) {
           console.warn('Ephemeral staff auth sign-up note:', authErr);
         }
-
-        // Step 2: Trigger password setup/recovery email directly to staff member's email
-        try {
-          const siteUrl = window.location.origin + window.location.pathname;
-          const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${siteUrl}#academic`,
-          });
-          if (!resetErr) {
-            emailDispatched = true;
-          }
-        } catch (resetErr) {
-          console.warn('Staff password setup email note:', resetErr);
-        }
       }
 
-      // Step 3: Insert into public.institute_staff with linked user_id
+      // Step 2: Insert into public.institute_staff with linked user_id
       const insertPayload: Record<string, unknown> = {
         staff_id_code: staffIdCode,
         full_name: params.fullName.trim(),
@@ -1283,9 +1270,6 @@ export const academicService = {
         };
       }
 
-      const inviteToken = Math.random().toString(36).substring(2, 12);
-      const inviteLink = `${window.location.origin}${window.location.pathname}#invite?token=${inviteToken}&email=${encodeURIComponent(email)}&kind=staff`;
-
       await logAudit({
         entityType: 'STAFF',
         entityId: inserted.id,
@@ -1298,8 +1282,8 @@ export const academicService = {
           fullName: inserted.full_name,
           email: inserted.email,
           designation: inserted.designation,
-          emailDispatched,
           authLinked: Boolean(authUserId),
+          defaultPassword: tempPassword,
         },
       });
 
@@ -1321,11 +1305,8 @@ export const academicService = {
           invitationStatus: inserted.invitation_status || 'active',
           createdAt: inserted.created_at,
         },
-        inviteLink,
         tempPassword,
-        message: emailDispatched
-          ? `Staff account created! Verification & password setup email dispatched to ${email}.`
-          : `Staff account created for ${email}.`,
+        message: `Staff account created! Sign in using email ${email} and default password ${tempPassword}.`,
       };
     }
 
@@ -1379,7 +1360,6 @@ export const academicService = {
     return {
       success: true,
       staff: newStaff,
-      inviteLink,
       tempPassword,
       message: `Staff account created for ${emailNorm}.`,
     };
@@ -1579,10 +1559,13 @@ export const academicService = {
     admissionDate?: string;
     operatorName: string;
     operatorRole: string;
-  }): Promise<{ success: boolean; student?: StudentProfile; error?: string; inviteLink?: string; tempPassword?: string; message?: string }> {
+  }): Promise<{ success: boolean; student?: StudentProfile; error?: string; tempPassword?: string; message?: string }> {
     const email = params.email.trim().toLowerCase();
     const currentYear = new Date().getFullYear();
-    const tempPassword = `Quantum#${Math.random().toString(36).slice(2, 6).toUpperCase()}!${Math.floor(100 + Math.random() * 900)}`;
+    const tempPassword = DEFAULT_INITIAL_PASSWORD;
+
+    // Register initial default password (123456) in credential store
+    credentialStore.setPassword(email, tempPassword);
 
     if (isSupabaseConfigured && supabase) {
       const studentIdCode = `QLI-STU-${currentYear}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -1590,11 +1573,9 @@ export const academicService = {
       // Step 1: Create auth user with ephemeral client to avoid terminating current staff session
       const ephemeral = getEphemeralAuthClient();
       let authUserId: string | null = null;
-      let emailDispatched = false;
 
       if (ephemeral) {
         try {
-          const siteUrl = window.location.origin + window.location.pathname;
           const { data: authData } = await ephemeral.auth.signUp({
             email,
             password: tempPassword,
@@ -1603,32 +1584,17 @@ export const academicService = {
                 full_name: params.fullName.trim(),
                 role: 'student',
               },
-              emailRedirectTo: `${siteUrl}#academic`,
             },
           });
           if (authData?.user?.id) {
             authUserId = authData.user.id;
-            emailDispatched = true;
           }
         } catch (authErr) {
           console.warn('Ephemeral student auth sign-up note:', authErr);
         }
-
-        // Step 2: Trigger password setup/recovery email directly to student's email
-        try {
-          const siteUrl = window.location.origin + window.location.pathname;
-          const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${siteUrl}#academic`,
-          });
-          if (!resetErr) {
-            emailDispatched = true;
-          }
-        } catch (resetErr) {
-          console.warn('Student password setup email note:', resetErr);
-        }
       }
 
-      // Step 3: Insert into public.student_profiles with linked user_id
+      // Step 2: Insert into public.student_profiles with linked user_id
       const insertPayload: Record<string, unknown> = {
         student_id_code: studentIdCode,
         full_name: params.fullName.trim(),
@@ -1660,9 +1626,6 @@ export const academicService = {
         };
       }
 
-      const inviteToken = Math.random().toString(36).substring(2, 12);
-      const inviteLink = `${window.location.origin}${window.location.pathname}#setup-student?token=${inviteToken}&roll=${encodeURIComponent(studentIdCode)}&email=${encodeURIComponent(email)}`;
-
       await logAudit({
         entityType: 'STUDENT',
         entityId: inserted.id,
@@ -1675,8 +1638,8 @@ export const academicService = {
           fullName: inserted.full_name,
           email: inserted.email,
           course: inserted.enrolled_course_name,
-          emailDispatched,
           authLinked: Boolean(authUserId),
+          defaultPassword: tempPassword,
         },
       });
 
@@ -1698,11 +1661,8 @@ export const academicService = {
           isPortalActive: inserted.is_portal_active !== false,
           invitationStatus: inserted.invitation_status || 'active',
         },
-        inviteLink,
         tempPassword,
-        message: emailDispatched
-          ? `Student enrolled! Password setup link dispatched to ${email}.`
-          : `Student enrolled successfully for ${email}.`,
+        message: `Student enrolled! Sign in using email ${email} and default password ${tempPassword}.`,
       };
     }
 
@@ -1775,10 +1735,58 @@ export const academicService = {
     return {
       success: true,
       student: newStudent,
-      inviteLink,
       tempPassword,
       message: `Student enrolled successfully for ${emailNorm}.`,
     };
+  },
+
+  async changeAccountPassword(params: {
+    email: string;
+    currentPassword?: string;
+    newPassword: string;
+    userRole: string;
+    userName: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    const email = params.email.trim().toLowerCase();
+    const newPass = params.newPassword.trim();
+    if (!newPass || newPass.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters long.' };
+    }
+
+    if (params.currentPassword) {
+      const isCurrentValid = credentialStore.verifyPassword(email, params.currentPassword);
+      if (!isCurrentValid) {
+        return { success: false, error: 'Current password does not match our records.' };
+      }
+    }
+
+    credentialStore.setPassword(email, newPass);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error: updateErr } = await supabase.auth.updateUser({ password: newPass });
+        if (updateErr) {
+          console.warn('Supabase auth password update note:', updateErr.message);
+        }
+      } catch (err) {
+        console.warn('Supabase auth password update error:', err);
+      }
+    }
+
+    try {
+      await logAudit({
+        entityType: params.userRole === 'student' ? 'STUDENT' : 'STAFF',
+        entityId: email,
+        action: 'UPDATE',
+        performedBy: params.userName,
+        performedByName: params.userName,
+        performedByRole: params.userRole,
+        reason: 'User successfully updated their personal account password',
+        details: { email },
+      });
+    } catch {}
+
+    return { success: true };
   },
 
   async updateStudentProfile(

@@ -231,16 +231,34 @@ export const StudentAcademicDashboard: React.FC<StudentAcademicDashboardProps> =
     }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPass.length < 6) {
       alert('Password must be at least 6 characters.');
       return;
     }
-    setPassSuccess(true);
-    setCurrentPass('');
-    setNewPass('');
-    setTimeout(() => setPassSuccess(false), 4000);
+    const emailToUpdate = user?.email || currentStudent?.email || '';
+    if (!emailToUpdate) {
+      alert('No user email associated with this account.');
+      return;
+    }
+
+    const res = await academicService.changeAccountPassword({
+      email: emailToUpdate,
+      currentPassword: currentPass,
+      newPassword: newPass,
+      userRole: 'student',
+      userName: user?.name || currentStudent?.fullName || 'Student',
+    });
+
+    if (res.success) {
+      setPassSuccess(true);
+      setCurrentPass('');
+      setNewPass('');
+      setTimeout(() => setPassSuccess(false), 5000);
+    } else {
+      alert(res.error || 'Failed to update password.');
+    }
   };
 
   const certificatesList = documents.filter(d => d.documentType === 'certificate');
