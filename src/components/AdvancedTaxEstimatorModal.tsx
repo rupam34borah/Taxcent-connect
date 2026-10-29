@@ -296,6 +296,20 @@ export const AdvancedTaxEstimatorModal: React.FC<AdvancedTaxEstimatorModalProps>
               <option value="super_senior">Super Senior (&gt; 80 yrs)</option>
             </select>
           </div>
+
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+              {lang === 'as' ? 'বাসিন্দাৰ অৱস্থা:' : 'Residential Status:'}
+            </span>
+            <select
+              value={residentialStatus}
+              onChange={(e) => setResidentialStatus(e.target.value as 'resident' | 'non_resident')}
+              className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="resident">Resident</option>
+              <option value="non_resident">Non-resident (NRI)</option>
+            </select>
+          </div>
         </div>
 
         {/* Main Content Area */}
@@ -1035,7 +1049,7 @@ export const AdvancedTaxEstimatorModal: React.FC<AdvancedTaxEstimatorModalProps>
         {/* Modal Footer */}
         <div className="bg-slate-50 border-t border-slate-200 px-5 sm:px-8 py-3.5 flex items-center justify-between gap-4 text-xs shrink-0">
           <span className="text-slate-500 text-[11px]">
-            *Calculated as per Indian Income Tax Act (Finance Act 2024 revisions included).
+            *Estimate based on selected tax year and Indian Income-tax Act rules. Special cases and final liability may differ.
           </span>
           <button
             onClick={onClose}

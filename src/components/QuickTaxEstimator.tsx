@@ -38,6 +38,7 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
   // Assessment Year state (Default Base Year is AY 2027-28 / FY 2026-27)
   const [assessmentYear, setAssessmentYear] = useState<AssessmentYear>('2027-28');
   const [ageGroup, setAgeGroup] = useState<TaxpayerAgeGroup>('under_60');
+  const [residentialStatus, setResidentialStatus] = useState<'resident' | 'non_resident'>('resident');
   const [isSalaried, setIsSalaried] = useState<boolean>(true);
   const [annualIncome, setAnnualIncome] = useState<number>(850000);
 
@@ -59,6 +60,7 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
   const quickInputs: QuickTaxInputs = useMemo(() => ({
     assessmentYear,
     ageGroup,
+    residentialStatus,
     isSalaried,
     annualIncome,
     deduction80C,
@@ -68,6 +70,7 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
   }), [
     assessmentYear,
     ageGroup,
+    residentialStatus,
     isSalaried,
     annualIncome,
     deduction80C,
@@ -135,7 +138,7 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
                   <span>{lang === 'as' ? 'দ্ৰুত আয়কৰ গণনা' : 'Taxcent Tax Tools'}</span>
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider">
-                  {lang === 'as' ? 'বাজেট ২০২৪ সংশোধিত' : 'Budget 2024 Updated'}
+                  {lang === 'as' ? 'কৰ বৰ্ষ অনুসৰি আপডেট' : 'Year-specific tax rules'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -260,8 +263,11 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
               <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-bold">Budget 2024 Revised Slabs Active:</span> Standard deduction for salaried is{' '}
-                  <strong className="underline">₹75,000</strong>. Income up to <strong className="underline">₹7.75 Lakhs</strong> is 100% tax-free for salaried taxpayers under the New Tax Regime!
+                  {assessmentYear === '2025-26' ? (
+                    <><span className="font-bold">Finance Act 2024 rates:</span> New-regime slabs apply with a ₹75,000 salary standard deduction; resident individuals may receive Section 87A rebate up to ₹7 lakh taxable income.</>
+                  ) : (
+                    <><span className="font-bold">Finance Act 2025 rates:</span> New-regime slabs start at ₹4 lakh; resident individuals may receive Section 87A rebate up to ₹12 lakh taxable income (₹12.75 lakh gross salary with the ₹75,000 standard deduction).</>
+                  )}
                 </div>
               </div>
             )}
@@ -275,7 +281,7 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
             </h3>
 
             {/* Age Category & Salaried Toggle */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   {lang === 'as' ? 'বয়সৰ শ্ৰেণী' : 'Taxpayer Age Category'}
@@ -288,6 +294,20 @@ export const QuickTaxEstimator: React.FC<QuickTaxEstimatorProps> = ({
                   <option value="under_60">Individual (&lt; 60 Years)</option>
                   <option value="senior">Senior Citizen (60 - 80 Years)</option>
                   <option value="super_senior">Super Senior Citizen (&gt; 80 Years)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {lang === 'as' ? 'বাসস্থানৰ অৱস্থা' : 'Residential Status'}
+                </label>
+                <select
+                  value={residentialStatus}
+                  onChange={(e) => setResidentialStatus(e.target.value as 'resident' | 'non_resident')}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="resident">Resident</option>
+                  <option value="non_resident">Non-resident (NRI)</option>
                 </select>
               </div>
 
