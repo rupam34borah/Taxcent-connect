@@ -71,10 +71,12 @@ export const Header: React.FC<HeaderProps> = ({
     <>
       <header className="sticky top-0 z-40 bg-[#0a2540] text-white border-b border-sky-950/60 shadow-md w-full">
         <div className="max-w-7xl mx-auto px-2.5 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
-          {/* Zone 1: Brand Wordmark */}
+          {/* Zone 1: Brand Wordmark (Navigates to Home) */}
           <button
             onClick={() => handleNavClick('home')}
             className="flex items-center gap-2 sm:gap-2.5 text-left focus:outline-hidden group cursor-pointer whitespace-nowrap shrink-0 min-w-0"
+            title="Taxcent Connect - Return to Home"
+            aria-label="Taxcent Connect Home"
           >
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center font-black text-white text-base sm:text-lg tracking-wider shadow-inner group-hover:scale-105 transition-transform shrink-0">
               T
@@ -89,19 +91,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </button>
 
-          {/* Zone 2: Navigation Links (Desktop: Home, CSC, Computer Courses + Dropdown for other items) */}
+          {/* Zone 2: Navigation Links (Desktop: CSC, Computer Courses + Dropdown for other items) */}
           <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-sm font-medium text-slate-200 shrink-0">
-            {/* 1. Home */}
-            <button
-              onClick={() => handleNavClick('home')}
-              className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
-                activeTab === 'home'
-                  ? 'text-sky-300 font-semibold border-b-2 border-sky-400'
-                  : 'hover:text-white'
-              }`}
-            >
-              {lang === 'as' ? 'মুখ্যপৃষ্ঠা' : 'Home'}
-            </button>
 
             {/* 2. CSC Citizen Services */}
             <button

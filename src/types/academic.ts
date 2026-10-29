@@ -177,6 +177,7 @@ export interface AcademicDocument {
   examAnswerSheetFileName?: string;
   examAnswerSheetFileData?: string;
   examAnswerSheetMimeType?: string;
+  answerSheetStoragePath?: string;
   courseDurationMonths?: number;
 }
 

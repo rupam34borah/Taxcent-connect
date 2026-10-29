@@ -31,13 +31,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 async function resolveAuthorizedUser(authUser: User): Promise<AuthUser | null> {
   if (!supabase) return null;
 
-  const { data: staff, error: staffError } = await supabase
+  // Attempt auto-linking if the user was pre-enrolled on the roster by admin
+  try {
+    await supabase.rpc('claim_roster_profile');
+  } catch {
+    // If migration function is not yet installed, proceed to standard checks
+  }
+
+  let { data: staff, error: staffError } = await supabase
     .from('institute_staff')
-    .select('id, full_name, email, role, is_active, invitation_status')
+    .select('id, full_name, email, role, is_active, invitation_status, user_id')
     .eq('user_id', authUser.id)
     .maybeSingle();
 
   if (staffError) throw staffError;
+
+  if (!staff && authUser.email) {
+    const { data: staffByEmail } = await supabase
+      .from('institute_staff')
+      .select('id, full_name, email, role, is_active, invitation_status, user_id')
+      .eq('email', authUser.email.trim().toLowerCase())
+      .is('user_id', null)
+      .maybeSingle();
+
+    if (staffByEmail) {
+      staff = staffByEmail;
+    }
+  }
+
   if (staff?.is_active && staff.invitation_status === 'active' && (staff.role === 'admin' || staff.role === 'staff')) {
     return {
       id: staff.id,
@@ -48,13 +69,27 @@ async function resolveAuthorizedUser(authUser: User): Promise<AuthUser | null> {
     };
   }
 
-  const { data: student, error: studentError } = await supabase
+  let { data: student, error: studentError } = await supabase
     .from('student_profiles')
-    .select('id, student_id_code, full_name, email, enrolled_course_name, is_portal_active, enrolment_status')
+    .select('id, student_id_code, full_name, email, enrolled_course_name, is_portal_active, enrolment_status, user_id')
     .eq('user_id', authUser.id)
     .maybeSingle();
 
   if (studentError) throw studentError;
+
+  if (!student && authUser.email) {
+    const { data: studentByEmail } = await supabase
+      .from('student_profiles')
+      .select('id, student_id_code, full_name, email, enrolled_course_name, is_portal_active, enrolment_status, user_id')
+      .eq('email', authUser.email.trim().toLowerCase())
+      .is('user_id', null)
+      .maybeSingle();
+
+    if (studentByEmail) {
+      student = studentByEmail;
+    }
+  }
+
   if (
     student?.is_portal_active &&
     student.enrolment_status !== 'suspended' &&
@@ -97,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authorizedUser = await resolveAuthorizedUser(session.user);
         if (!mounted) return;
         setUser(authorizedUser);
-        if (!authorizedUser) await supabase.auth.signOut();
+        if (!authorizedUser) await supabase?.auth.signOut();
       } catch (error) {
         console.error('Could not verify the account role:', error);
         if (mounted) setUser(null);
