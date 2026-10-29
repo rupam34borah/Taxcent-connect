@@ -27,6 +27,23 @@ import {
   computeGradeFrom100 
 } from '../utils/certificateGenerator';
 
+async function getFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context instanceof Response) {
+    try {
+      const payload = await context.clone().json() as { error?: unknown; message?: unknown };
+      if (typeof payload.error === 'string' && payload.error.trim()) return payload.error;
+      if (typeof payload.message === 'string' && payload.message.trim()) return payload.message;
+    } catch {
+      // Some gateway and network errors have no JSON body.
+    }
+    return `${fallback} (HTTP ${context.status})`;
+  }
+
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
 // Local Storage Keys for offline / local-authoritative persistence
 const STORAGE_KEYS = {
   DOCS: 'taxcent_qli_academic_docs_v2',
@@ -1179,7 +1196,8 @@ export const academicService = {
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: { kind: 'staff', fullName: params.fullName.trim(), email, phone: params.phone.trim(), designation: params.designation.trim() || 'Instructor', role: params.role, permissions: params.permissions, assignedCourses: params.assignedCourses, assignedBatches: params.assignedBatches, staffIdCode },
       });
-      if (error || !data?.staff) return { success: false, error: error?.message || data?.error || 'Could not invite this staff member.' };
+      if (error) return { success: false, error: await getFunctionErrorMessage(error, 'Could not invite this staff member.') };
+      if (!data?.staff) return { success: false, error: typeof data?.error === 'string' ? data.error : 'The invitation service returned an incomplete response.' };
       const row = data.staff;
       return { success: true, staff: { id: row.id, userId: row.user_id, staffIdCode: row.staff_id_code, fullName: row.full_name, email: row.email, phone: row.phone || '', designation: row.designation || 'Instructor', role: row.role, permissions: row.permissions || [], assignedCourses: row.assigned_courses || [], assignedBatches: row.assigned_batches || [], isActive: row.is_active !== false, invitationStatus: row.invitation_status || 'pending', createdAt: row.created_at } };
     }
@@ -1355,7 +1373,8 @@ export const academicService = {
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: { kind: 'student', fullName: params.fullName.trim(), email: params.email.trim().toLowerCase(), phone: params.phone.trim(), courseId: params.courseId, courseName: params.courseName, batchId: params.batchId || null, batchCode: params.batchCode || null, admissionDate: params.admissionDate || new Date().toISOString().slice(0, 10), operatorName: params.operatorName, studentIdCode },
       });
-      if (error || !data?.student) return { success: false, error: error?.message || data?.error || 'Could not invite this student.' };
+      if (error) return { success: false, error: await getFunctionErrorMessage(error, 'Could not invite this student.') };
+      if (!data?.student) return { success: false, error: typeof data?.error === 'string' ? data.error : 'The invitation service returned an incomplete response.' };
       const row = data.student;
       return { success: true, student: { id: row.id, userId: row.user_id || undefined, studentIdCode: row.student_id_code, fullName: row.full_name, email: row.email, phone: row.phone || '', enrolledCourse: row.enrolled_course_name || '', enrolledCourseId: row.enrolled_course_id || undefined, batchId: row.batch_id || undefined, batchCode: row.batch_code || undefined, admissionDate: row.admission_date, enrolmentStatus: row.enrolment_status || 'active', isPortalActive: row.is_portal_active !== false, invitationStatus: row.invitation_status || 'pending' } };
     }
