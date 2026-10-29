@@ -5,8 +5,13 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
+  // GitHub Pages serves this repository below /<repository-name>/, while
+  // local development and the built-in preview use the domain root.
+  const configuredBase = process.env.VITE_BASE_PATH || '/';
+  const base = configuredBase.endsWith('/') ? configuredBase : `${configuredBase}/`;
+
   return {
-    base: './',
+    base,
     plugins: [
       react(),
       tailwindcss(),
@@ -14,30 +19,30 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'icon.svg', 'apple-touch-icon.png'],
         manifest: {
-          id: '/',
+          id: base,
           name: 'Taxcent Connect',
           short_name: 'Taxcent',
           description: 'Digital portal for Taxcent Consulting Services, Quantum Learning Institute, and CSC Ranabari at Ranabari Market, NH-15, Lakhimpur, Assam.',
           theme_color: '#0a2540',
           background_color: '#0a2540',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: base,
+          scope: base,
           icons: [
             {
-              src: '/icon-192x192.png',
+              src: `${base}icon-192x192.png`,
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/icon-512x512.png',
+              src: `${base}icon-512x512.png`,
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/icon-maskable-512x512.png',
+              src: `${base}icon-maskable-512x512.png`,
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
