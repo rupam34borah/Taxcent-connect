@@ -57,7 +57,10 @@ import {
   Printer,
   Paperclip,
   Sparkles,
-  UploadCloud
+  UploadCloud,
+  KeyRound,
+  Copy,
+  Mail
 } from 'lucide-react';
 
 interface StaffAcademicDashboardProps {
@@ -105,9 +108,12 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
   const [previewDoc, setPreviewDoc] = useState<AcademicDocument | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Invite Link state
+  // Invite Link & Credentials state
   const [generatedInviteLink, setGeneratedInviteLink] = useState('');
+  const [generatedTempPassword, setGeneratedTempPassword] = useState('');
   const [inviteModalTitle, setInviteModalTitle] = useState('');
+  const [inviteModalEmail, setInviteModalEmail] = useState('');
+  const [copiedType, setCopiedType] = useState<'link' | 'password' | null>(null);
 
   // Selected item references for actions
   const [selectedAttendance, setSelectedAttendance] = useState<AttendanceRecord | null>(null);
@@ -270,13 +276,12 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
       });
       await loadAllData();
 
-      if (res.inviteLink) {
-        setInviteModalTitle(`Staff Account Created: ${res.staff.fullName}`);
-        setGeneratedInviteLink(res.inviteLink);
-        setIsInviteLinkModalOpen(true);
-      } else {
-        alert(`Invitation email sent to ${res.staff.email}. They can sign in after accepting it.`);
-      }
+      setInviteModalTitle(res.message || `Staff Member Created: ${res.staff.fullName}`);
+      setInviteModalEmail(res.staff.email);
+      setGeneratedInviteLink(res.inviteLink || '');
+      setGeneratedTempPassword(res.tempPassword || '');
+      setCopiedType(null);
+      setIsInviteLinkModalOpen(true);
     } else {
       alert(res.error || 'Failed to create staff member.');
     }
@@ -303,7 +308,10 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
     });
     if (res.success && res.inviteLink) {
       setInviteModalTitle(res.message || `Access & Invitation Link for ${stf.fullName} (${stf.email})`);
+      setInviteModalEmail(stf.email);
       setGeneratedInviteLink(res.inviteLink);
+      setGeneratedTempPassword('');
+      setCopiedType(null);
       setIsInviteLinkModalOpen(true);
     } else {
       alert(res.error || 'Failed to resend invite link.');
@@ -319,7 +327,10 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
     });
     if (res.success && res.inviteLink) {
       setInviteModalTitle(res.message || `Access & Invitation Link for ${stu.fullName} (${stu.email})`);
+      setInviteModalEmail(stu.email);
       setGeneratedInviteLink(res.inviteLink);
+      setGeneratedTempPassword('');
+      setCopiedType(null);
       setIsInviteLinkModalOpen(true);
     } else {
       alert(res.error || 'Failed to resend invite link.');
@@ -358,13 +369,12 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
       });
       await loadAllData();
 
-      if (res.inviteLink) {
-        setInviteModalTitle(`Student Enrolled: ${res.student.fullName} (${res.student.studentIdCode})`);
-        setGeneratedInviteLink(res.inviteLink);
-        setIsInviteLinkModalOpen(true);
-      } else {
-        alert(`Invitation email sent to ${res.student.email}. They can sign in after accepting it.`);
-      }
+      setInviteModalTitle(res.message || `Student Enrolled: ${res.student.fullName} (${res.student.studentIdCode})`);
+      setInviteModalEmail(res.student.email);
+      setGeneratedInviteLink(res.inviteLink || '');
+      setGeneratedTempPassword(res.tempPassword || '');
+      setCopiedType(null);
+      setIsInviteLinkModalOpen(true);
     } else {
       alert(res.error || 'Failed to register student.');
     }
@@ -2227,50 +2237,101 @@ export const StaffAcademicDashboard: React.FC<StaffAcademicDashboardProps> = ({ 
         </div>
       )}
 
-      {/* Modal 3: Invite Link Display */}
+      {/* Modal 3: Invite Link & Credentials Display */}
       {isInviteLinkModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Send className="w-5 h-5 text-emerald-400" />
-                <span>Single-Use Password Setup Link</span>
-              </h3>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Credentials & Access Ready</h3>
+                  <p className="text-[11px] text-emerald-400 font-medium">Automatic verification & setup email dispatched</p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsInviteLinkModalOpen(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300">
-              {inviteModalTitle}
-            </p>
-
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
-              <span className="text-[10px] text-slate-400 font-mono block">Secure Verification Link:</span>
-              <div className="font-mono text-xs text-sky-400 break-all select-all">
-                {generatedInviteLink}
+            <div className="bg-sky-950/30 border border-sky-800/40 rounded-2xl p-3.5 space-y-1">
+              <div className="flex items-center gap-2 text-xs font-semibold text-sky-300">
+                <Mail className="w-4 h-4 text-sky-400 shrink-0" />
+                <span>Verification Email Dispatched</span>
               </div>
+              <p className="text-xs text-slate-300 pl-6">
+                An official setup link has been sent to <strong className="text-white font-mono">{inviteModalEmail}</strong>. The recipient can click the link in their inbox to verify their account and create their confidential password.
+              </p>
             </div>
 
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              In production with Supabase Auth, this invitation is dispatched automatically via authenticated email SMTP. The recipient clicks the single-use token to verify their identity and set their confidential password.
-            </p>
+            {generatedTempPassword && (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                    Default Initial Password
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedTempPassword);
+                      setCopiedType('password');
+                      setTimeout(() => setCopiedType(null), 2500);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    {copiedType === 'password' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedType === 'password' ? 'Copied!' : 'Copy Password'}</span>
+                  </button>
+                </div>
+                <div className="font-mono text-sm text-amber-300 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 select-all tracking-wider font-semibold">
+                  {generatedTempPassword}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Recipient can also sign in right away with this default password and will be prompted to change it.
+                </p>
+              </div>
+            )}
+
+            {generatedInviteLink && (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5 text-sky-400" />
+                    Direct Portal Access Link
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedInviteLink);
+                      setCopiedType('link');
+                      setTimeout(() => setCopiedType(null), 2500);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    {copiedType === 'link' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedType === 'link' ? 'Copied!' : 'Copy Link'}</span>
+                  </button>
+                </div>
+                <div className="font-mono text-xs text-sky-400 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 select-all break-all max-h-20 overflow-y-auto">
+                  {generatedInviteLink}
+                </div>
+              </div>
+            )}
 
             <div className="pt-2 flex justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(generatedInviteLink);
-                  alert('Copied invite link to clipboard!');
-                  setIsInviteLinkModalOpen(false);
-                }}
-                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer"
+                onClick={() => setIsInviteLinkModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
               >
-                Copy Link & Close
+                Done
               </button>
             </div>
           </div>

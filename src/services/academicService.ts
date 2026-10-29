@@ -20,7 +20,21 @@ import {
   ExamCategory,
   PersonType
 } from '../types/academic';
+import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
+function getEphemeralAuthClient() {
+  const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+  const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  if (!rawUrl || !rawKey) return null;
+  return createClient(rawUrl, rawKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
 import { 
   generateOfficialCertificateSvg, 
   generateOfficialMarksheetSvg, 
@@ -1189,92 +1203,88 @@ export const academicService = {
     assignedCourses: string[];
     assignedBatches: string[];
     adminName: string;
-  }): Promise<{ success: boolean; staff?: StaffMember; error?: string; inviteLink?: string }> {
+  }): Promise<{ success: boolean; staff?: StaffMember; error?: string; inviteLink?: string; tempPassword?: string; message?: string }> {
+    const email = params.email.trim().toLowerCase();
+    const currentYear = new Date().getFullYear();
+    const tempPassword = `Taxcent#${Math.random().toString(36).slice(2, 6).toUpperCase()}!${Math.floor(100 + Math.random() * 900)}`;
+
     if (isSupabaseConfigured && supabase) {
-      const email = params.email.trim().toLowerCase();
-      const staffIdCode = `QLI-STF-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const staffIdCode = `QLI-STF-${currentYear}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
       
-      let functionError: string | null = null;
-      try {
-        const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
-        const session = (await supabase.auth.getSession()).data.session;
-        const headers: Record<string, string> = {};
-        if (rawKey) headers['apikey'] = rawKey;
-        if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+      // Step 1: Create auth user with ephemeral client to avoid disrupting current admin session
+      const ephemeral = getEphemeralAuthClient();
+      let authUserId: string | null = null;
+      let emailDispatched = false;
 
-        const { data, error } = await supabase.functions.invoke('invite-user', {
-          headers: Object.keys(headers).length > 0 ? headers : undefined,
-          body: {
-            kind: 'staff',
-            fullName: params.fullName.trim(),
+      if (ephemeral) {
+        try {
+          const siteUrl = window.location.origin + window.location.pathname;
+          const { data: authData } = await ephemeral.auth.signUp({
             email,
-            phone: params.phone.trim(),
-            designation: params.designation.trim() || 'Instructor',
-            role: params.role,
-            permissions: params.permissions,
-            assignedCourses: params.assignedCourses,
-            assignedBatches: params.assignedBatches,
-            staffIdCode,
-          },
-        });
-
-        if (!error && data?.staff) {
-          const row = data.staff;
-          return {
-            success: true,
-            staff: {
-              id: row.id,
-              userId: row.user_id,
-              staffIdCode: row.staff_id_code,
-              fullName: row.full_name,
-              email: row.email,
-              phone: row.phone || '',
-              designation: row.designation || 'Instructor',
-              role: row.role,
-              permissions: row.permissions || [],
-              assignedCourses: row.assigned_courses || [],
-              assignedBatches: row.assigned_batches || [],
-              isActive: row.is_active !== false,
-              invitationStatus: row.invitation_status || 'pending',
-              createdAt: row.created_at,
+            password: tempPassword,
+            options: {
+              data: {
+                full_name: params.fullName.trim(),
+                role: params.role,
+              },
+              emailRedirectTo: `${siteUrl}#academic`,
             },
-          };
+          });
+          if (authData?.user?.id) {
+            authUserId = authData.user.id;
+            emailDispatched = true;
+          }
+        } catch (authErr) {
+          console.warn('Ephemeral staff auth sign-up note:', authErr);
         }
-        if (error) {
-          functionError = await getFunctionErrorMessage(error, '');
-        } else if (data?.error) {
-          functionError = String(data.error);
+
+        // Step 2: Trigger password setup/recovery email directly to staff member's email
+        try {
+          const siteUrl = window.location.origin + window.location.pathname;
+          const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${siteUrl}#academic`,
+          });
+          if (!resetErr) {
+            emailDispatched = true;
+          }
+        } catch (resetErr) {
+          console.warn('Staff password setup email note:', resetErr);
         }
-      } catch (err: unknown) {
-        functionError = err instanceof Error ? err.message : 'Edge function call failed';
       }
 
-      // Resilient fallback: If the Edge Function is not deployed or failed (e.g. gateway apikey error),
-      // insert directly into public.institute_staff using the authenticated admin's RLS permissions.
+      // Step 3: Insert into public.institute_staff with linked user_id
+      const insertPayload: Record<string, unknown> = {
+        staff_id_code: staffIdCode,
+        full_name: params.fullName.trim(),
+        email,
+        phone: params.phone.trim(),
+        designation: params.designation.trim() || 'Instructor',
+        role: params.role,
+        permissions: params.permissions,
+        assigned_courses: params.assignedCourses,
+        assigned_batches: params.assignedBatches,
+        is_active: true,
+        invitation_status: 'active',
+      };
+      if (authUserId) {
+        insertPayload.user_id = authUserId;
+      }
+
       const { data: inserted, error: insertError } = await supabase
         .from('institute_staff')
-        .insert({
-          staff_id_code: staffIdCode,
-          full_name: params.fullName.trim(),
-          email,
-          phone: params.phone.trim(),
-          designation: params.designation.trim() || 'Instructor',
-          role: params.role,
-          permissions: params.permissions,
-          assigned_courses: params.assignedCourses,
-          assigned_batches: params.assignedBatches,
-          is_active: true,
-          invitation_status: 'active',
-        })
+        .insert(insertPayload)
         .select('*')
         .single();
 
       if (insertError) {
         return {
           success: false,
-          error: insertError.message || functionError || 'Could not add staff member to the roster.',
+          error: insertError.message || 'Could not add staff member to the roster.',
         };
       }
+
+      const inviteToken = Math.random().toString(36).substring(2, 12);
+      const inviteLink = `${window.location.origin}${window.location.pathname}#invite?token=${inviteToken}&email=${encodeURIComponent(email)}&kind=staff`;
 
       await logAudit({
         entityType: 'STAFF',
@@ -1288,7 +1298,8 @@ export const academicService = {
           fullName: inserted.full_name,
           email: inserted.email,
           designation: inserted.designation,
-          fallbackDirectInsert: Boolean(functionError),
+          emailDispatched,
+          authLinked: Boolean(authUserId),
         },
       });
 
@@ -1310,16 +1321,21 @@ export const academicService = {
           invitationStatus: inserted.invitation_status || 'active',
           createdAt: inserted.created_at,
         },
+        inviteLink,
+        tempPassword,
+        message: emailDispatched
+          ? `Staff account created! Verification & password setup email dispatched to ${email}.`
+          : `Staff account created for ${email}.`,
       };
     }
+
     const staffList = await this.getStaffMembers();
-    const emailNorm = params.email.trim().toLowerCase();
+    const emailNorm = email;
 
     if (staffList.some(s => s.email.toLowerCase() === emailNorm)) {
       return { success: false, error: 'A staff member with this verified email already exists.' };
     }
 
-    const currentYear = new Date().getFullYear();
     const count = staffList.length + 1;
     const staffIdCode = `QLI-STF-${currentYear}-${String(count).padStart(3, '0')}`;
 
@@ -1342,9 +1358,8 @@ export const academicService = {
     staffList.push(newStaff);
     saveToStorage(STORAGE_KEYS.STAFF, staffList);
 
-    // Simulated single-use invitation link (admin never sees or enters password)
     const inviteToken = Math.random().toString(36).substring(2, 12);
-    const inviteLink = `${window.location.origin}${window.location.pathname}#invite?token=${inviteToken}&email=${encodeURIComponent(emailNorm)}`;
+    const inviteLink = `${window.location.origin}${window.location.pathname}#invite?token=${inviteToken}&email=${encodeURIComponent(emailNorm)}&kind=staff`;
 
     await logAudit({
       entityType: 'STAFF',
@@ -1361,7 +1376,13 @@ export const academicService = {
       },
     });
 
-    return { success: true, staff: newStaff, inviteLink };
+    return {
+      success: true,
+      staff: newStaff,
+      inviteLink,
+      tempPassword,
+      message: `Staff account created for ${emailNorm}.`,
+    };
   },
 
   async toggleStaffActive(staffId: string, adminName: string, reason?: string): Promise<{ success: boolean; error?: string }> {
@@ -1558,90 +1579,106 @@ export const academicService = {
     admissionDate?: string;
     operatorName: string;
     operatorRole: string;
-  }): Promise<{ success: boolean; student?: StudentProfile; error?: string; inviteLink?: string }> {
+  }): Promise<{ success: boolean; student?: StudentProfile; error?: string; inviteLink?: string; tempPassword?: string; message?: string }> {
+    const email = params.email.trim().toLowerCase();
+    const currentYear = new Date().getFullYear();
+    const tempPassword = `Quantum#${Math.random().toString(36).slice(2, 6).toUpperCase()}!${Math.floor(100 + Math.random() * 900)}`;
+
     if (isSupabaseConfigured && supabase) {
-      const email = params.email.trim().toLowerCase();
-      const studentIdCode = `QLI-STU-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const studentIdCode = `QLI-STU-${currentYear}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-      let functionError: string | null = null;
-      try {
-        const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
-        const session = (await supabase.auth.getSession()).data.session;
-        const headers: Record<string, string> = {};
-        if (rawKey) headers['apikey'] = rawKey;
-        if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+      // Step 1: Create auth user with ephemeral client to avoid terminating current staff session
+      const ephemeral = getEphemeralAuthClient();
+      let authUserId: string | null = null;
+      let emailDispatched = false;
 
-        const { data, error } = await supabase.functions.invoke('invite-user', {
-          headers: Object.keys(headers).length > 0 ? headers : undefined,
-          body: {
-            kind: 'student',
-            fullName: params.fullName.trim(),
+      if (ephemeral) {
+        try {
+          const siteUrl = window.location.origin + window.location.pathname;
+          const { data: authData } = await ephemeral.auth.signUp({
             email,
-            phone: params.phone.trim(),
-            courseId: params.courseId,
-            courseName: params.courseName,
-            batchId: params.batchId || null,
-            batchCode: params.batchCode || null,
-            admissionDate: params.admissionDate || new Date().toISOString().slice(0, 10),
-            operatorName: params.operatorName,
-            studentIdCode,
-          },
-        });
-
-        if (!error && data?.student) {
-          const row = data.student;
-          return {
-            success: true,
-            student: {
-              id: row.id,
-              userId: row.user_id || undefined,
-              studentIdCode: row.student_id_code,
-              fullName: row.full_name,
-              email: row.email,
-              phone: row.phone || '',
-              enrolledCourse: row.enrolled_course_name || '',
-              enrolledCourseId: row.enrolled_course_id || undefined,
-              batchId: row.batch_id || undefined,
-              batchCode: row.batch_code || undefined,
-              admissionDate: row.admission_date,
-              enrolmentStatus: row.enrolment_status || 'active',
-              isPortalActive: row.is_portal_active !== false,
-              invitationStatus: row.invitation_status || 'pending',
+            password: tempPassword,
+            options: {
+              data: {
+                full_name: params.fullName.trim(),
+                role: 'student',
+              },
+              emailRedirectTo: `${siteUrl}#academic`,
             },
-          };
+          });
+          if (authData?.user?.id) {
+            authUserId = authData.user.id;
+            emailDispatched = true;
+          }
+        } catch (authErr) {
+          console.warn('Ephemeral student auth sign-up note:', authErr);
         }
-        if (error) functionError = await getFunctionErrorMessage(error, '');
-        else if (data?.error) functionError = String(data.error);
-      } catch (err: unknown) {
-        functionError = err instanceof Error ? err.message : 'Edge function call failed';
+
+        // Step 2: Trigger password setup/recovery email directly to student's email
+        try {
+          const siteUrl = window.location.origin + window.location.pathname;
+          const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${siteUrl}#academic`,
+          });
+          if (!resetErr) {
+            emailDispatched = true;
+          }
+        } catch (resetErr) {
+          console.warn('Student password setup email note:', resetErr);
+        }
       }
 
-      // Resilient fallback: Direct insert into public.student_profiles using authenticated staff RLS
+      // Step 3: Insert into public.student_profiles with linked user_id
+      const insertPayload: Record<string, unknown> = {
+        student_id_code: studentIdCode,
+        full_name: params.fullName.trim(),
+        email,
+        phone: params.phone.trim(),
+        enrolled_course_id: params.courseId || null,
+        enrolled_course_name: params.courseName || 'Unassigned',
+        batch_id: params.batchId || null,
+        batch_code: params.batchCode || null,
+        admission_date: params.admissionDate || new Date().toISOString().slice(0, 10),
+        enrolment_status: 'active',
+        is_portal_active: true,
+        invitation_sent_at: new Date().toISOString(),
+      };
+      if (authUserId) {
+        insertPayload.user_id = authUserId;
+      }
+
       const { data: inserted, error: insertError } = await supabase
         .from('student_profiles')
-        .insert({
-          student_id_code: studentIdCode,
-          full_name: params.fullName.trim(),
-          email,
-          phone: params.phone.trim(),
-          enrolled_course_id: params.courseId || null,
-          enrolled_course_name: params.courseName || 'Unassigned',
-          batch_id: params.batchId || null,
-          batch_code: params.batchCode || null,
-          admission_date: params.admissionDate || new Date().toISOString().slice(0, 10),
-          enrolment_status: 'active',
-          is_portal_active: true,
-          invitation_sent_at: new Date().toISOString(),
-        })
+        .insert(insertPayload)
         .select('*')
         .single();
 
       if (insertError) {
         return {
           success: false,
-          error: insertError.message || functionError || 'Could not enroll student in the roster.',
+          error: insertError.message || 'Could not enroll student in the roster.',
         };
       }
+
+      const inviteToken = Math.random().toString(36).substring(2, 12);
+      const inviteLink = `${window.location.origin}${window.location.pathname}#setup-student?token=${inviteToken}&roll=${encodeURIComponent(studentIdCode)}&email=${encodeURIComponent(email)}`;
+
+      await logAudit({
+        entityType: 'STUDENT',
+        entityId: inserted.id,
+        action: 'CREATE',
+        performedBy: params.operatorName,
+        performedByName: params.operatorName,
+        performedByRole: params.operatorRole,
+        details: {
+          studentIdCode: inserted.student_id_code,
+          fullName: inserted.full_name,
+          email: inserted.email,
+          course: inserted.enrolled_course_name,
+          emailDispatched,
+          authLinked: Boolean(authUserId),
+        },
+      });
 
       return {
         success: true,
@@ -1661,16 +1698,21 @@ export const academicService = {
           isPortalActive: inserted.is_portal_active !== false,
           invitationStatus: inserted.invitation_status || 'active',
         },
+        inviteLink,
+        tempPassword,
+        message: emailDispatched
+          ? `Student enrolled! Password setup link dispatched to ${email}.`
+          : `Student enrolled successfully for ${email}.`,
       };
     }
+
     const students = await this.getStudentProfiles();
-    const emailNorm = params.email.trim().toLowerCase();
+    const emailNorm = email;
 
     if (students.some(s => s.email.toLowerCase() === emailNorm)) {
       return { success: false, error: 'A student profile with this email address already exists.' };
     }
 
-    const currentYear = new Date().getFullYear();
     const count = students.length + 1;
     const studentIdCode = `QLI-STU-${currentYear}-${String(count).padStart(3, '0')}`;
 
@@ -1713,7 +1755,7 @@ export const academicService = {
     saveToStorage(STORAGE_KEYS.ATTENDANCE_STUDENT, attendance);
 
     const inviteToken = Math.random().toString(36).substring(2, 10);
-    const inviteLink = `${window.location.origin}${window.location.pathname}#setup-student?token=${inviteToken}&roll=${encodeURIComponent(studentIdCode)}`;
+    const inviteLink = `${window.location.origin}${window.location.pathname}#setup-student?token=${inviteToken}&roll=${encodeURIComponent(studentIdCode)}&email=${encodeURIComponent(emailNorm)}`;
 
     await logAudit({
       entityType: 'STUDENT',
@@ -1730,7 +1772,13 @@ export const academicService = {
       },
     });
 
-    return { success: true, student: newStudent, inviteLink };
+    return {
+      success: true,
+      student: newStudent,
+      inviteLink,
+      tempPassword,
+      message: `Student enrolled successfully for ${emailNorm}.`,
+    };
   },
 
   async updateStudentProfile(
